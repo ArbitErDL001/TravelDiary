@@ -1,0 +1,11 @@
+{% extends "diary/base.html" %}
+{% block title %}Notifications — Roam{% endblock %}
+{% block breadcrumb %}Notifications{% endblock %}
+{% block content %}
+  <section class="page-hero"><div><p class="eyebrow">YOUR ACTIVITY</p><h1>Notifications <span>✧</span></h1><p>See who is keeping up with your travel stories.</p></div></section>
+  <section class="notifications-page panel">
+    {% for item in notifications %}
+      {% if item.kind == "follow" or item.kind == "friend_accepted" %}<div class="notification-item notification-item-large"><span class="notification-icon"><svg><use href="#bell"/></svg></span><span><strong>{{ item.name }}</strong> {{ item.text }}<small>{{ item.time|timesince }} ago</small></span>{% if item.kind == "follow" or item.kind == "friend_accepted" %}    {% if item.follow_back_state == "available" %}<form method="post" action="{% url 'add_friend' item.user.id %}">{% csrf_token %}<button class="notification-follow-button" type="submit">Follow back</button></form>{% elif item.follow_back_state == "pending" %}<span class="notification-follow-button notification-accepted">Added friend</span>{% elif item.follow_back_state == "accepted" or item.kind == "friend_accepted" %}<span class="notification-follow-button notification-accepted">{% if item.kind == "friend_accepted" %}Accepted{% else %}Friends{% endif %}</span>{% endif %}{% endif %}{% if item.id %}<form class="notification-delete-form" method="post" action="{% url 'delete_notification' item.id %}">{% csrf_token %}<button class="notification-delete" type="submit" aria-label="Delete notification">×</button></form>{% endif %}</div>{% else %}<a class="notification-item notification-item-large" href="{% url 'dashboard' %}#post-{{ item.photo.id }}"><span class="notification-icon"><svg><use href="#bell"/></svg></span><span><strong>{{ item.name }}</strong> {{ item.text }}{% if item.photo.caption %} — “{{ item.photo.caption }}”{% endif %}<small>{{ item.time|timesince }} ago</small></span><span class="notification-arrow">→</span></a>{% endif %}
+    {% empty %}<div class="empty-page"><span class="sparkle">✧</span><h2>No notifications yet.</h2><p>Likes, comments, and new stories from your circle will appear here.</p></div>{% endfor %}
+  </section>
+{% endblock %}

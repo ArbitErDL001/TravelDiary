@@ -1,0 +1,12 @@
+{% extends "diary/base.html" %}
+{% block title %}My diary — Roam{% endblock %}
+{% block breadcrumb %}My diary{% endblock %}
+{% block content %}
+  <section class="page-hero"><div><p class="eyebrow">YOUR MEMORIES</p><h1>My <span>diary</span></h1><p>Small moments. Lasting memories. All yours.</p></div><a class="primary-button" href="{% url 'add_memory' %}"><span>＋</span> New entry</a></section>
+  <div class="page-toolbar"><nav class="page-tabs" aria-label="Diary filters"><a class="active" href="#memories">All memories · {{ entries|length }}</a><a href="#memories">Private entries</a></nav><small>Your world, one memory at a time.</small></div>
+  <section class="social-grid" id="memories">
+    {% for entry in entries %}
+      <article class="memory-card panel">{% if entry.image %}<img src="{{ entry.image.url }}" alt="{{ entry.caption|default:'Travel memory' }}" data-fullscreen-photo tabindex="0" role="button" aria-label="View full-size photo: {{ entry.caption|default:'Travel memory' }}">{% else %}<div class="memory-placeholder" aria-hidden="true">✧</div>{% endif %}<div class="memory-card-body"><small>{% if entry.place %}{{ entry.place.name }}{% else %}Travel memory{% endif %} · {{ entry.created_at|date:"M j, Y" }}</small><h2>{{ entry.caption|default:"A moment worth remembering" }}</h2><p>{{ entry.travel.title }}</p>{% if request.user.is_authenticated and entry.author_id == request.user.id %}<details class="owner-controls"><summary aria-label="Post options">•••</summary><div class="owner-menu"><form method="post" action="{% url 'edit_photo_caption' entry.id %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><input name="caption" value="{{ entry.caption }}" maxlength="255" aria-label="Edit caption"><button type="submit">Save caption</button></form><form method="post" action="{% url 'delete_photo' entry.id %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="danger-action" type="submit">Delete post</button></form></div></details>{% endif %}<a href="{% url 'add_memory' %}">Add another memory →</a></div></article>
+    {% empty %}<div class="empty-page panel"><span class="sparkle">✧</span><h2>Your diary is waiting.</h2><p>Upload your first photo and start building your story.</p><a class="primary-button" href="{% url 'dashboard' %}#upload">Upload a memory</a></div>{% endfor %}
+  </section>
+{% endblock %}

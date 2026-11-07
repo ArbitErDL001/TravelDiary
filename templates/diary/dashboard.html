@@ -1,0 +1,553 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Roam — Your travel diary</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+      document.documentElement.dataset.theme = localStorage.getItem("roam-theme") || "light";
+    </script>
+    <link rel="stylesheet" href="{% static 'diary/dashboard.css' %}?v=31">
+  </head>
+  <body>
+    <svg class="svg-library" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        <symbol id="grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>
+        <symbol id="book" viewBox="0 0 24 24"><path d="M12 5C9 3 5 3 2 4v16c3-1 7-1 10 1 3-2 7-2 10-1V4c-3-1-7-1-10 1v16"/></symbol>
+        <symbol id="route" viewBox="0 0 24 24"><circle cx="6" cy="18" r="3"/><circle cx="18" cy="6" r="3"/><path d="M6 15V8a3 3 0 0 1 3-3h3M18 9v7a3 3 0 0 1-3 3h-3"/></symbol>
+        <symbol id="bookmark" viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></symbol>
+        <symbol id="users" viewBox="0 0 24 24"><circle cx="9" cy="7" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 4a3 3 0 0 1 0 6M21 21v-3a6 6 0 0 0-4-5"/></symbol>
+        <symbol id="globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/></symbol>
+        <symbol id="image" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></symbol>
+        <symbol id="heart" viewBox="0 0 24 24"><path d="m12 20-1.6-1.45C5 13.7 2 10.95 2 7.5A4.5 4.5 0 0 1 6.5 3c1.74 0 3.41.81 4.5 2.09A6 6 0 0 1 15.5 3 4.5 4.5 0 0 1 20 7.5c0 3.45-3 6.2-8.4 11.05z"/></symbol>
+        <symbol id="comment" viewBox="0 0 24 24"><path d="M20 11.5a8.5 8.5 0 0 1-8.5 8.5 8.5 8.5 0 0 1-4.1-1.05L3 20l1.05-4.4A8.5 8.5 0 1 1 20 11.5z"/></symbol>
+        <symbol id="send" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4 20-7zM22 2 11 13"/></symbol>
+        <symbol id="bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></symbol>
+        <symbol id="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></symbol>
+        <symbol id="moon" viewBox="0 0 24 24"><path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13z"/></symbol>
+        <symbol id="follow" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></symbol>
+        <symbol id="search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="7.5"/><path d="m16 16 5 5"/></symbol>
+        <symbol id="pin" viewBox="0 0 24 24"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+      </defs>
+    </svg>
+
+    <div class="app">
+      <aside class="sidebar">
+        <a class="brand" href="{% url 'dashboard' %}" aria-label="Roam home"><span class="brand-mark">◎</span> roam.</a>
+        <p class="overline">Your space</p>
+        <nav class="side-nav" aria-label="Main navigation">
+          <a class="active" href="{% url 'dashboard' %}" aria-current="page"><svg><use href="#grid"/></svg>Your feed <span class="dot"></span></a>
+          <a href="{% url 'diary' %}"><svg><use href="#book"/></svg>My diary</a>
+          <a href="{% url 'journeys' %}"><svg><use href="#route"/></svg>Journeys</a>
+          <a href="{% url 'saved_places' %}"><svg><use href="#bookmark"/></svg>Saved places</a>
+          <a href="{% url 'circle' %}"><svg><use href="#users"/></svg>Travel circle</a>
+        </nav>
+        <div class="sidebar-bottom">
+          <section class="journal-prompt"><span class="sparkle">✧</span><h3>Small moments.<br>Lasting memories.</h3><p>Your next favorite story is waiting to be written.</p><a href="{% url 'add_memory' %}">Open your diary →</a></section>
+          <a class="settings" href="{% url 'map' %}">⌖ &nbsp; Explore your map</a>
+          <div class="account"><button class="avatar account-avatar" type="button" aria-label="Open account menu" aria-expanded="false">{% if user_avatar %}<img src="{{ user_avatar }}" alt="Profile photo">{% else %}{{ user_initials }}{% endif %}</button><div><a class="account-profile-link" href="{% url 'profile' %}"><strong>{{ user_name }}</strong></a><small>{% if request.user.is_authenticated %}@{{ request.user.username }}{% else %}<a href="{% url 'login' %}">Log in</a>{% endif %}</small></div><div class="account-menu" hidden><a href="{% url 'profile' %}">◉ &nbsp; View profile</a><a href="{% url 'settings' %}">⚙ &nbsp; Account settings</a>{% if request.user.is_authenticated %}<a href="{% url 'logout' %}">↪ &nbsp; Log out</a>{% else %}<a href="{% url 'login' %}">↪ &nbsp; Log in</a>{% endif %}</div><button class="theme-toggle" type="button" aria-label="Switch to dark mode" aria-pressed="false"><svg aria-hidden="true"><use href="#moon"/></svg></button></div>
+        </div>
+      </aside>
+
+      <div class="workspace">
+        <header class="topbar">
+          <div class="breadcrumb"><strong>Your feed</strong><span>/</span><span>Overview</span></div>
+          <a class="brand mobile-brand" href="{% url 'dashboard' %}"><span class="brand-mark">◎</span> roam.</a>
+          <div class="top-actions"><label class="search"><svg><use href="#search"/></svg><input id="feed-search" type="search" aria-label="Search" placeholder="Search places, people, memories"></label><div class="notification-wrap">                <button class="icon-button notification" aria-label="Notifications" type="button"><svg><use href="#bell"/></svg>{% if notification_count %}<span class="notification-count">{{ notification_count }}</span>{% endif %}</button><div class="notification-menu" hidden><div class="notification-menu-header"><div><strong>Notifications</strong><small>Stay in the loop</small></div><a href="{% url 'notifications' %}">View all <span>→</span></a></div>{% for item in notifications|slice:":4" %}{% if item.kind == "follow" or item.kind == "friend_accepted" %}<div class="notification-item"><span class="notification-icon"><svg><use href="#bell"/></svg></span><span class="notification-copy"><span><strong>{{ item.name }}</strong> {{ item.text }}</span><small>{{ item.time|timesince }} ago</small></span>{% if item.kind == "follow" or item.kind == "friend_accepted" %}        {% if item.follow_back_state == "available" %}<form method="post" action="{% url 'add_friend' item.user.id %}">{% csrf_token %}<button class="notification-follow-button" type="submit">Follow back</button></form>{% elif item.follow_back_state == "pending" %}<span class="notification-follow-button notification-accepted">Added friend</span>{% elif item.follow_back_state == "accepted" or item.kind == "friend_accepted" %}<span class="notification-follow-button notification-accepted">{% if item.kind == "friend_accepted" %}Accepted{% else %}Friends{% endif %}</span>{% endif %}{% endif %}{% if item.id %}<form class="notification-delete-form" method="post" action="{% url 'delete_notification' item.id %}">{% csrf_token %}<button class="notification-delete" type="submit" aria-label="Delete notification">×</button></form>{% endif %}</div>{% else %}<a class="notification-item" href="#post-{{ item.photo.id }}"><span class="notification-icon"><svg><use href="#bell"/></svg></span><span class="notification-copy"><span><strong>{{ item.name }}</strong> {{ item.text }}</span><small>{{ item.time|timesince }} ago · {{ item.photo.caption|default:"Travel memory"|truncatechars:34 }}</small></span><span class="notification-dot"></span></a>{% endif %}{% empty %}<div class="notification-empty"><span class="notification-empty-icon">✧</span><strong>All caught up</strong><p>No new activity from your circle.</p></div>{% endfor %}</div></div><a class="avatar" href="{% url 'profile' %}" aria-label="View profile">{% if user_avatar %}<img src="{{ user_avatar }}" alt="Profile photo">{% else %}{{ user_initials }}{% endif %}</a></div>
+        </header>
+
+        <main class="content">
+          <section class="welcome"><div><h1>Welcome back, {{ user_first_name }} <span>✧</span></h1><p class="desktop-subtitle">A home for everywhere you've been. And everywhere you'll go.</p><p class="mobile-subtitle">Your world, one memory at a time.</p></div><a class="primary-button" href="{% url 'add_memory' %}"><span>＋</span> New entry</a></section>
+
+          <div class="dashboard">
+            <section class="stats" aria-label="Travel overview">
+              <a class="stat" href="{% url 'journeys' %}" aria-label="View your {{ travel_count }} journeys"><span class="stat-icon"><svg><use href="#route"/></svg></span><div><strong>{{ travel_count }}</strong><small>Journeys</small></div></a>
+              <a class="stat" href="{% url 'profile_data' 'countries' %}" aria-label="View your {{ country_count }} countries"><span class="stat-icon"><svg><use href="#globe"/></svg></span><div><strong>{{ country_count }}</strong><small>Countries</small></div></a>
+              <a class="stat" href="{% url 'diary' %}" aria-label="View your {{ photo_count }} memories"><span class="stat-icon"><svg><use href="#image"/></svg></span><div><strong>{{ photo_count }}</strong><small>Memories</small></div></a>
+            </section>
+
+            <aside class="right-rail" aria-label="Travel overview">
+              <section class="journey panel" id="journey" aria-labelledby="journey-title">
+                <div class="panel-heading"><h2 id="journey-title">Current journey</h2><a href="{% url 'map' %}" aria-label="Open map">↗</a></div>
+                {% if current_travel %}
+                  <div class="journey-image">{% if current_photo and current_photo.image %}<img src="{{ current_photo.image.url }}" alt="{{ current_photo.caption|default:current_travel.title }}">{% else %}<img src="{{ current_journey_fallback }}" alt="Travel scenery for {{ current_travel.title }}">{% endif %}<span class="road-label">{{ current_travel.get_status_display }}</span></div>
+                  <div class="journey-details"><span class="mobile-road">{{ current_travel.get_status_display }}</span><h3>{{ current_travel.title }}</h3><p class="journey-dates">{{ current_travel.start_date }} – {{ current_travel.end_date }}</p><div class="progress-label"><span>{{ current_travel.status|title }}</span><span>{{ current_travel.photos.count }} memories saved</span></div><progress value="{{ current_progress }}" max="100" aria-label="Journey progress"></progress>{% if current_place %}<p class="location"><svg><use href="#pin"/></svg>{{ current_place.name }}</p><p class="mobile-location">{{ current_place.name }}</p>{% endif %}</div><span class="mobile-chevron">›</span>
+                {% else %}<div class="empty-state">Your next journey starts here.<br><a href="{% url 'add_memory' %}">Add a photo to begin →</a></div>{% endif %}
+              </section>
+              <aside class="community" id="community"><section class="activity panel"><div class="panel-heading"><h2>Around your circle</h2><span class="dot"></span></div><div class="activity-row"><span class="avatar soft">{{ user_initials }}</span><div><strong>Your diary</strong><p>{{ photo_count }} memories saved.</p><small>Keep exploring</small></div></div><a class="activity-link" href="{% url 'map' %}">View your map →</a></section><a class="wishlist panel" id="wishlist" href="{% url 'map' %}"><span class="stat-icon"><svg><use href="#bookmark"/></svg></span><div><strong>Somewhere, someday.</strong><small>{{ place_count }} places on your map</small></div><span>›</span></a><footer><a href="{% url 'dashboard' %}">About roam</a><a href="{% url 'map' %}">Map</a><span>© 2026 roam</span></footer></aside>
+            </aside>
+
+            <section class="feed" aria-labelledby="feed-title">
+              <div class="feed-heading"><h2 id="feed-title">Your daily escape</h2><div class="feed-filters" aria-label="Feed filters"><button class="selected" type="button" data-filter="following">Following</button><button class="discover" type="button" data-filter="discover">Discover</button></div></div>
+              {% for photo in photos %}
+                <article class="post panel" id="post-{{ photo.id }}" data-post data-search-text="{{ photo.caption }} {{ photo.travel.title }} {% if photo.place %}{{ photo.place.name }}{% endif %}">
+                  <header class="post-header"><span class="avatar">{% if photo.author and photo.author.travel_profile.avatar %}<img src="{{ photo.author.travel_profile.avatar.url }}" alt="{{ photo.author.get_full_name|default:photo.author.username }}">{% elif photo.author %}{{ photo.author.first_name|slice:":1" }}{{ photo.author.last_name|slice:":1" }}{% else %}{{ user_initials }}{% endif %}</span><div><div class="author">{% if photo.author %}{{ photo.author.get_full_name|default:photo.author.username }}{% else %}{% if photo.travel %}{{ photo.travel.title }}{% else %}Your journey{% endif %}{% endif %} {% if request.user.is_authenticated and photo.author_id == request.user.id %}<span>You</span>{% endif %}</div><small>{% if photo.place %}{{ photo.place.name }}{% else %}Travel diary{% endif %} · {{ photo.created_at|timesince }} ago</small></div>{% if request.user.is_authenticated and photo.author_id == request.user.id %}<details class="post-owner-controls"><summary class="icon-button more" aria-label="Post options">…</summary><div class="owner-menu"><form method="post" action="{% url 'edit_photo_caption' photo.id %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><input name="caption" value="{{ photo.caption }}" maxlength="255" aria-label="Edit caption"><button type="submit">Save caption</button></form><form method="post" action="{% url 'delete_photo' photo.id %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="danger-action" type="submit">Delete post</button></form></div></details>{% else %}<button class="icon-button more" aria-label="More options" type="button">…</button>{% endif %}</header>
+                  <div class="post-image">{% if photo.image %}<img src="{{ photo.image.url }}" alt="{{ photo.caption|default:'Travel memory' }}" data-fullscreen-photo tabindex="0" role="button" aria-label="View full-size photo: {{ photo.caption|default:'Travel memory' }}" loading="lazy" decoding="async">{% elif photo.author_id and photo.author_id|divisibleby:3 %}<img src="https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=1200&q=82" alt="Travel scene from {{ photo.place.name|default:'your journey' }}" data-fullscreen-photo tabindex="0" role="button" aria-label="View full-size travel photo" loading="lazy" decoding="async">{% elif photo.author_id and photo.author_id|divisibleby:2 %}<img src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1200&q=82" alt="Mountain travel scene" data-fullscreen-photo tabindex="0" role="button" aria-label="View full-size travel photo" loading="lazy" decoding="async">{% else %}<img src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=82" alt="Coastal travel scene" data-fullscreen-photo tabindex="0" role="button" aria-label="View full-size travel photo" loading="lazy" decoding="async">{% endif %}<span class="photo-label"><svg><use href="#book"/></svg>{% if photo.travel %}{{ photo.travel.title }}{% else %}Travel journal{% endif %}</span><span class="photo-count"><svg><use href="#image"/></svg>1</span></div>
+                  <div class="post-body">
+                    <h3>{{ photo.caption|default:"A moment worth remembering" }}</h3>
+                    <p>{% if photo.place %}A memory from {{ photo.place.name }}.{% else %}A little moment from the road.{% endif %}</p>
+                    <div class="post-actions"><button class="like-button" type="button" data-photo-id="{{ photo.id }}" data-liked="{% if request.user.is_authenticated and request.user in photo.likes.all %}true{% else %}false{% endif %}" aria-label="Like, {{ photo.likes.count }} likes"><svg><use href="#heart"/></svg><span>{{ photo.likes.count }}</span></button><button class="comment-toggle" type="button" aria-label="Comments, {{ photo.comments.count }} comments"><svg><use href="#comment"/></svg><span>{{ photo.comments.count }}</span></button><button class="share-button" type="button" aria-label="Share"><svg><use href="#send"/></svg></button><button class="save save-button" type="button" aria-label="Save post" data-photo-id="{{ photo.id }}"><svg><use href="#bookmark"/></svg></button></div>
+                    <div class="comments-panel" hidden>
+                      <div class="comment-list">
+                        {% for comment in photo.comments.all %}
+                          {% if not comment.parent_id %}
+                            <article class="comment-thread" data-comment-id="{{ comment.id }}">
+                              <div class="comment-item">
+                                <p class="comment-copy"><strong>{% if comment.author %}{{ comment.author.username }}{% elif comment.guest_name %}{{ comment.guest_name }}{% else %}Guest{% endif %}</strong><span>{{ comment.body }}</span></p>
+                                <div class="comment-actions">
+                                  {% if request.user.is_authenticated %}
+                                    <button class="comment-like{% if request.user in comment.likes.all %} liked{% endif %}" type="button" data-comment-like-url="{% url 'like_comment' comment.id %}" aria-pressed="{% if request.user in comment.likes.all %}true{% else %}false{% endif %}"><svg><use href="#heart"/></svg><span>{{ comment.likes.count }}</span></button>
+                                    <button class="comment-reply" type="button" data-reply-to="{{ comment.id }}" data-reply-name="{% if comment.author %}{{ comment.author.username }}{% elif comment.guest_name %}{{ comment.guest_name }}{% else %}Guest{% endif %}">Reply</button>
+                                  {% endif %}
+                                  {% if request.user.is_authenticated and comment.author_id == request.user.id %}
+                                    <details class="comment-owner-controls">
+                                      <summary aria-label="Comment options">…</summary>
+                                      <div class="owner-menu">
+                                        <form method="post" action="{% url 'edit_comment' comment.id %}">
+                                          {% csrf_token %}
+                                          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                          <input name="body" value="{{ comment.body }}" maxlength="1000" aria-label="Edit comment">
+                                          <button type="submit">Save comment</button>
+                                        </form>
+                                        <form method="post" action="{% url 'delete_comment' comment.id %}">
+                                          {% csrf_token %}
+                                          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                          <button class="danger-action" type="submit">Delete comment</button>
+                                        </form>
+                                      </div>
+                                    </details>
+                                  {% endif %}
+                                </div>
+                              </div>
+                              {% for reply in comment.replies.all %}
+                                <div class="comment-item comment-reply-item">
+                                  <p class="comment-copy"><strong>{% if reply.author %}{{ reply.author.username }}{% elif reply.guest_name %}{{ reply.guest_name }}{% else %}Guest{% endif %}</strong><span>{{ reply.body }}</span></p>
+                                  <div class="comment-actions">
+                                    {% if request.user.is_authenticated %}
+                                      <button class="comment-like{% if request.user in reply.likes.all %} liked{% endif %}" type="button" data-comment-like-url="{% url 'like_comment' reply.id %}" aria-pressed="{% if request.user in reply.likes.all %}true{% else %}false{% endif %}"><svg><use href="#heart"/></svg><span>{{ reply.likes.count }}</span></button>
+                                    {% endif %}
+                                    {% if request.user.is_authenticated and reply.author_id == request.user.id %}
+                                      <details class="comment-owner-controls">
+                                        <summary aria-label="Comment options">…</summary>
+                                        <div class="owner-menu">
+                                          <form method="post" action="{% url 'edit_comment' reply.id %}">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                            <input name="body" value="{{ reply.body }}" maxlength="1000" aria-label="Edit reply">
+                                            <button type="submit">Save reply</button>
+                                          </form>
+                                          <form method="post" action="{% url 'delete_comment' reply.id %}">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                            <button class="danger-action" type="submit">Delete reply</button>
+                                          </form>
+                                        </div>
+                                      </details>
+                                    {% endif %}
+                                  </div>
+                                </div>
+                              {% endfor %}
+                            </article>
+                          {% endif %}
+                        {% empty %}
+                          <p class="comments-empty">No comments yet. Start the conversation.</p>
+                        {% endfor %}
+                      </div>
+                      {% if request.user.is_authenticated %}
+                        <form class="comment-form" action="{% url 'add_comment' photo.id %}" method="post">
+                          {% csrf_token %}
+                          <input type="hidden" name="parent_comment" value="">
+                          <textarea name="body" placeholder="Write a comment..." aria-label="Write a comment" maxlength="1000" required></textarea>
+                          <div class="comment-form-actions"><span class="comment-replying" data-replying hidden>Replying to <strong></strong><button type="button" data-cancel-reply aria-label="Cancel reply">×</button></span><button type="submit">Post</button></div>
+                        </form>
+                      {% else %}
+                        <p class="comment-login-prompt"><a href="{% url 'login' %}?next={{ request.get_full_path|urlencode }}">Log in to comment</a></p>
+                      {% endif %}
+                    </div>
+                  </div>
+                </article>
+              {% empty %}<article class="post panel empty-feed"><h3>Your story is waiting to be written.</h3><p>Upload your first photo to start filling your travel diary with memories.</p></article>
+              {% endfor %}
+              <div class="feed-loader" data-feed-loader hidden role="status" aria-live="polite"><span class="feed-loader-spinner" aria-hidden="true"></span><span>Loading more posts…</span></div>
+
+            </section>
+
+          </div>
+        </main>
+      </div>
+    </div>
+    <nav class="bottom-nav" aria-label="Mobile navigation"><a class="active" href="{% url 'dashboard' %}" aria-current="page"><svg><use href="#grid"/></svg><span>Feed</span></a><a href="{% url 'diary' %}"><svg><use href="#book"/></svg><span>Diary</span></a><a class="add-entry" href="{% url 'add_memory' %}" aria-label="New entry">＋</a><a href="{% url 'journeys' %}"><svg><use href="#route"/></svg><span>Journeys</span></a><a href="{% url 'saved_places' %}"><svg><use href="#bookmark"/></svg><span>Saved</span></a></nav>
+    <div class="toast" role="status" aria-live="polite"></div>
+    <script>
+      (() => {
+        const toast = document.querySelector(".toast");
+        const showToast = (message) => {
+          toast.textContent = message;
+          toast.classList.add("visible");
+          window.clearTimeout(showToast.timer);
+          showToast.timer = window.setTimeout(() => toast.classList.remove("visible"), 2600);
+        };
+        const getCookie = (name) => document.cookie.split("; ").find((row) => row.startsWith(`${name}=`))?.split("=")[1];
+        const csrfToken = decodeURIComponent(getCookie("csrftoken") || "");
+        const jsonHeaders = {"Content-Type": "application/json", "X-CSRFToken": csrfToken};
+
+        document.querySelectorAll('a[href^="#"]').forEach((link) => {
+          link.addEventListener("click", (event) => {
+            const target = document.querySelector(link.getAttribute("href"));
+            if (!target) return;
+            event.preventDefault();
+            target.scrollIntoView({behavior: "smooth", block: "start"});
+            history.replaceState(null, "", link.getAttribute("href"));
+          });
+        });
+
+        const sidebarLinks = [...document.querySelectorAll(".side-nav a")];
+        sidebarLinks.forEach((link) => {
+          link.addEventListener("click", () => {
+            sidebarLinks.forEach((item) => {
+              item.classList.remove("active");
+              item.removeAttribute("aria-current");
+            });
+            link.classList.add("active");
+            link.setAttribute("aria-current", "page");
+          });
+        });
+
+        document.querySelectorAll(".like-button").forEach((button) => {
+          button.addEventListener("click", async () => {
+            const count = button.querySelector("span");
+            const photoId = button.dataset.photoId;
+            try {
+              const response = await fetch(`/api/photos/${photoId}/like/`, {method: "POST", headers: jsonHeaders, credentials: "same-origin"});
+              if (response.status === 401) {
+                const key = `roam-liked-${photoId}`;
+                const liked = localStorage.getItem(key) === "true";
+                localStorage.setItem(key, String(!liked));
+                count.textContent = Math.max(0, Number(count.textContent) + (liked ? -1 : 1));
+                button.classList.toggle("liked", !liked);
+                showToast(liked ? "Like removed" : "Liked locally — sign in to sync it");
+                return;
+              }
+              if (!response.ok) throw new Error("Like failed");
+              const result = await response.json();
+              count.textContent = result.like_count;
+              button.classList.toggle("liked", result.liked);
+              showToast(result.liked ? "Added to your likes" : "Like removed");
+            } catch (error) {
+              showToast("Could not update this like");
+            }
+          });
+        });
+
+        document.querySelectorAll(".save-button").forEach((button) => {
+          const key = `roam-saved-${button.dataset.photoId}`;
+          button.classList.toggle("saved", localStorage.getItem(key) === "true");
+          button.addEventListener("click", () => {
+            const saved = localStorage.getItem(key) === "true";
+            localStorage.setItem(key, String(!saved));
+            button.classList.toggle("saved", !saved);
+            showToast(saved ? "Removed from saved memories" : "Saved to your memories");
+          });
+        });
+
+        document.querySelectorAll(".comment-toggle").forEach((button) => {
+          button.addEventListener("click", () => {
+            const panel = button.closest(".post-body").querySelector(".comments-panel");
+            panel.hidden = !panel.hidden;
+            if (!panel.hidden) panel.querySelector(".comment-form textarea[name=body]")?.focus();
+          });
+        });
+
+        document.querySelectorAll(".comment-reply").forEach((button) => {
+          button.addEventListener("click", () => {
+            const form = button.closest(".comments-panel").querySelector(".comment-form");
+            form.elements.parent_comment.value = button.dataset.replyTo;
+            form.querySelector("[data-replying] strong").textContent = button.dataset.replyName;
+            form.querySelector("[data-replying]").hidden = false;
+            form.querySelector("textarea[name=body]").focus();
+          });
+        });
+
+        document.querySelectorAll("[data-cancel-reply]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const form = button.closest(".comment-form");
+            form.elements.parent_comment.value = "";
+            form.querySelector("[data-replying]").hidden = true;
+          });
+        });
+
+        document.querySelectorAll(".comment-like").forEach((button) => {
+          button.addEventListener("click", async () => {
+            try {
+              const response = await fetch(button.dataset.commentLikeUrl, {
+                method: "POST",
+                headers: {"X-CSRFToken": csrfToken, "X-Requested-With": "XMLHttpRequest"},
+                credentials: "same-origin",
+              });
+              if (!response.ok) throw new Error("Comment like failed");
+              const result = await response.json();
+              button.querySelector("span").textContent = result.like_count;
+              button.classList.toggle("liked", result.liked);
+              button.setAttribute("aria-pressed", String(result.liked));
+            } catch (error) {
+              showToast("Could not update this comment like");
+            }
+          });
+        });
+
+        document.querySelectorAll(".comment-form").forEach((form) => {
+          form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            const body = form.elements.body.value.trim();
+            if (!body) return;
+            const parentId = form.elements.parent_comment.value;
+            const post = form.closest(".post");
+            try {
+              const response = await fetch("/api/photo-comments/", {
+                method: "POST",
+                headers: jsonHeaders,
+                credentials: "same-origin",
+                body: JSON.stringify({
+                  photo: form.action.match(/photos\/(\d+)/)[1],
+                  body,
+                  parent: parentId || null,
+                }),
+              });
+              if (!response.ok) throw new Error("Comment could not be posted");
+              const comment = await response.json();
+              const item = createCommentItem(comment, Boolean(parentId));
+              const list = form.closest(".comments-panel").querySelector(".comment-list");
+              if (parentId) {
+                list.querySelector(`[data-comment-id="${parentId}"]`)?.append(item);
+              } else {
+                list.querySelector(".comments-empty")?.remove();
+                const thread = document.createElement("article");
+                thread.className = "comment-thread";
+                thread.dataset.commentId = comment.id;
+                thread.append(item);
+                list.append(thread);
+              }
+              const count = post.querySelector(".comment-toggle span");
+              const nextCount = Number(count.textContent) + 1;
+              count.textContent = nextCount;
+              post.querySelector(".comment-toggle").setAttribute("aria-label", `Comments, ${nextCount} comments`);
+              form.reset();
+              form.querySelector("[data-replying]").hidden = true;
+              showToast(parentId ? "Reply posted" : "Comment posted");
+            } catch (error) {
+              showToast(error.message || "Could not post your comment");
+            }
+          });
+        });
+
+        function createCommentItem(comment, isReply) {
+          const item = document.createElement("div");
+          item.className = `comment-item${isReply ? " comment-reply-item" : ""}`;
+          const copy = document.createElement("p");
+          copy.className = "comment-copy";
+          const author = document.createElement("strong");
+          author.textContent = comment.author_name;
+          const body = document.createElement("span");
+          body.textContent = comment.body;
+          copy.append(author, body);
+          const actions = document.createElement("div");
+          actions.className = "comment-actions";
+          actions.append(createCommentLikeButton(comment.id, comment.like_count));
+          if (!isReply) {
+            const reply = document.createElement("button");
+            reply.className = "comment-reply";
+            reply.type = "button";
+            reply.dataset.replyTo = comment.id;
+            reply.dataset.replyName = comment.author_name;
+            reply.textContent = "Reply";
+            reply.addEventListener("click", () => {
+              const form = item.closest(".comments-panel").querySelector(".comment-form");
+              form.elements.parent_comment.value = comment.id;
+              form.querySelector("[data-replying] strong").textContent = comment.author_name;
+              form.querySelector("[data-replying]").hidden = false;
+              form.querySelector("textarea[name=body]").focus();
+            });
+            actions.append(reply);
+          }
+          const options = document.createElement("details");
+          options.className = "comment-owner-controls";
+          const summary = document.createElement("summary");
+          summary.setAttribute("aria-label", "Comment options");
+          summary.textContent = "…";
+          const menu = document.createElement("div");
+          menu.className = "owner-menu";
+          const editForm = document.createElement("form");
+          editForm.className = "comment-edit-form";
+          editForm.action = `/comments/${comment.id}/edit/`;
+          editForm.method = "post";
+          editForm.innerHTML = `<input type="hidden" name="csrfmiddlewaretoken" value="${csrfToken}">`;
+          const editInput = document.createElement("input");
+          editInput.name = "body";
+          editInput.value = comment.body;
+          editInput.maxLength = 1000;
+          editInput.setAttribute("aria-label", isReply ? "Edit reply" : "Edit comment");
+          const save = document.createElement("button");
+          save.type = "submit";
+          save.textContent = isReply ? "Save reply" : "Save comment";
+          editForm.append(editInput, save);
+          const deleteForm = document.createElement("form");
+          deleteForm.action = `/comments/${comment.id}/delete/`;
+          deleteForm.method = "post";
+          deleteForm.innerHTML = `<input type="hidden" name="csrfmiddlewaretoken" value="${csrfToken}">`;
+          const remove = document.createElement("button");
+          remove.className = "danger-action";
+          remove.type = "submit";
+          remove.textContent = isReply ? "Delete reply" : "Delete comment";
+          deleteForm.append(remove);
+          menu.append(editForm, deleteForm);
+          options.append(summary, menu);
+          actions.append(options);
+          item.append(copy, actions);
+          item.querySelector(".comment-like").addEventListener("click", handleCommentLike);
+          return item;
+        }
+
+        function createCommentLikeButton(commentId, likeCount) {
+          const button = document.createElement("button");
+          button.className = "comment-like";
+          button.type = "button";
+          button.dataset.commentLikeUrl = `/comments/${commentId}/like/`;
+          button.setAttribute("aria-pressed", "false");
+          button.innerHTML = `<svg><use href="#heart"></use></svg><span>${likeCount}</span>`;
+          return button;
+        }
+
+        async function handleCommentLike() {
+          const button = this;
+          try {
+            const response = await fetch(button.dataset.commentLikeUrl, {
+              method: "POST",
+              headers: {"X-CSRFToken": csrfToken, "X-Requested-With": "XMLHttpRequest"},
+              credentials: "same-origin",
+            });
+            if (!response.ok) throw new Error("Comment like failed");
+            const result = await response.json();
+            button.querySelector("span").textContent = result.like_count;
+            button.classList.toggle("liked", result.liked);
+            button.setAttribute("aria-pressed", String(result.liked));
+          } catch (error) {
+            showToast("Could not update this comment like");
+          }
+        }
+
+        document.querySelectorAll(".share-button").forEach((button) => {
+          button.addEventListener("click", async () => {
+            const post = button.closest(".post");
+            const shareData = {title: post.querySelector("h3").textContent, text: post.querySelector(".post-body p").textContent, url: window.location.href};
+            try {
+              if (navigator.share) await navigator.share(shareData);
+              else { await navigator.clipboard.writeText(window.location.href); showToast("Link copied to your clipboard"); }
+            } catch (error) {
+              if (error.name !== "AbortError") showToast("Sharing is not available here");
+            }
+          });
+        });
+
+        document.querySelectorAll("button.more").forEach((button) => button.addEventListener("click", () => showToast("More post actions are coming soon")));
+        const notificationButton = document.querySelector(".notification");
+        const notificationMenu = document.querySelector(".notification-menu");
+        notificationButton?.addEventListener("click", (event) => {
+          event.stopPropagation();
+          notificationMenu.hidden = !notificationMenu.hidden;
+          if (!notificationMenu.hidden && {{ notification_count|default:0 }}) {
+            fetch("{% url 'mark_notifications_read' %}", {headers: {"X-Requested-With": "XMLHttpRequest"}});
+            const badge = notificationButton.querySelector(".notification-count");
+            if (badge) badge.remove();
+          }
+        });
+        document.addEventListener("click", () => {
+          if (notificationMenu) notificationMenu.hidden = true;
+          if (accountMenu) accountMenu.hidden = true;
+        });
+        const accountAvatar = document.querySelector(".account-avatar");
+        const accountMenu = document.querySelector(".account-menu");
+        const themeToggle = document.querySelector(".theme-toggle");
+        const updateThemeToggle = () => {
+          const isDark = document.documentElement.dataset.theme === "dark";
+          themeToggle?.setAttribute("aria-label", `Switch to ${isDark ? "light" : "dark"} mode`);
+          themeToggle?.setAttribute("aria-pressed", String(isDark));
+          const icon = themeToggle?.querySelector("use");
+          if (icon) icon.setAttribute("href", isDark ? "#sun" : "#moon");
+        };
+        updateThemeToggle();
+        themeToggle?.addEventListener("click", () => {
+          const theme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+          document.documentElement.dataset.theme = theme;
+          localStorage.setItem("roam-theme", theme);
+          updateThemeToggle();
+        });
+        accountAvatar?.addEventListener("click", (event) => {
+          event.stopPropagation();
+          accountMenu.hidden = !accountMenu.hidden;
+          accountAvatar.setAttribute("aria-expanded", String(!accountMenu.hidden));
+        });
+
+        const posts = [...document.querySelectorAll("[data-post]")];
+        const feedLoader = document.querySelector("[data-feed-loader]");
+        const feedBatchSize = 15;
+        let visiblePostCount = feedBatchSize;
+        let loadingMorePosts = false;
+        let activeFeedFilter = "following";
+        const updateFeedPosts = () => {
+          const query = document.querySelector("#feed-search").value.trim().toLowerCase();
+          const matchingPosts = posts.filter((post) => {
+            const matchesFilter = activeFeedFilter === "following" || !post.dataset.searchText.toLowerCase().includes("your journey");
+            const matchesSearch = !query || post.dataset.searchText.toLowerCase().includes(query);
+            return matchesFilter && matchesSearch;
+          });
+          posts.forEach((post) => { post.hidden = true; });
+          matchingPosts.forEach((post, index) => {
+            post.hidden = !query && index >= visiblePostCount;
+          });
+          if (feedLoader) feedLoader.hidden = Boolean(query) || matchingPosts.length <= visiblePostCount;
+        };
+        const loadNextPostBatch = () => {
+          if (loadingMorePosts || !feedLoader || feedLoader.hidden || document.querySelector("#feed-search").value.trim()) return;
+          loadingMorePosts = true;
+          window.setTimeout(() => {
+            visiblePostCount += feedBatchSize;
+            updateFeedPosts();
+            loadingMorePosts = false;
+            if (feedObserver && !feedLoader.hidden) {
+              feedObserver.unobserve(feedLoader);
+              feedObserver.observe(feedLoader);
+            }
+          }, 350);
+        };
+        let feedObserver;
+        if ("IntersectionObserver" in window && feedLoader) {
+          feedObserver = new IntersectionObserver((entries) => {
+            if (entries.some((entry) => entry.isIntersecting)) loadNextPostBatch();
+          }, {rootMargin: "240px 0px"});
+          feedObserver.observe(feedLoader);
+        } else {
+          visiblePostCount = posts.length;
+        }
+        updateFeedPosts();
+        const applySearch = () => {
+          updateFeedPosts();
+        };
+        document.querySelector("#feed-search").addEventListener("input", applySearch);
+        document.querySelectorAll("[data-filter]").forEach((filter) => filter.addEventListener("click", () => {
+          document.querySelectorAll("[data-filter]").forEach((item) => item.classList.remove("selected"));
+          filter.classList.add("selected");
+          activeFeedFilter = filter.dataset.filter;
+          visiblePostCount = feedBatchSize;
+          updateFeedPosts();
+          showToast(filter.dataset.filter === "discover" ? "Showing discoverable memories" : "Showing your following feed");
+        }));
+      })();
+    </script>
+    {% include "diary/photo_viewer.html" %}
+    <script src="{% static 'diary/photo-viewer.js' %}?v=1"></script>
+  </body>
+</html>

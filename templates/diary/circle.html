@@ -1,0 +1,84 @@
+{% extends "diary/base.html" %}
+{% block title %}Travel circle — Roam{% endblock %}
+{% block breadcrumb %}Travel circle{% endblock %}
+{% block content %}
+  <section class="page-hero"><div><p class="eyebrow">YOUR COMMUNITY</p><h1>Travel <span>circle</span></h1><p>Share inspiration, follow adventures, and keep wandering together.</p></div><a class="primary-button" href="{% url 'friends' %}"><span>＋</span> Add friends</a></section>
+  <div class="page-toolbar"><nav class="page-tabs" aria-label="Circle filters"><a class="active" href="#circle-feed" data-circle-tab="following">Following</a><a href="#discover" data-circle-tab="discover">Discover</a></nav><small>Your people, one adventure at a time.</small></div>
+  <section class="circle-layout circle-tab-panel" id="following-content"><div class="activity panel"><div class="panel-heading"><h2>People you may know</h2><span class="dot"></span></div>{% for person in suggestions %}<div class="friend-row"><a class="friend-profile-link" href="{% url 'public_profile' person.id %}"><span class="avatar soft">{% if person.travel_profile.avatar %}<img src="{{ person.travel_profile.avatar.url }}" alt="{{ person.get_full_name|default:person.username }}">{% else %}{{ person.first_name|slice:":1" }}{{ person.last_name|slice:":1" }}{% endif %}</span><span><strong>{{ person.get_full_name|default:person.username }}</strong><small>@{{ person.username }}</small></span></a><a class="follow-button" href="{% url 'public_profile' person.id %}">View</a></div>{% empty %}<div class="friends-empty">No people to show yet.</div>{% endfor %}<a class="activity-view-more" href="{% url 'friends' %}">View more →</a></div><div class="circle-feed" id="circle-feed">{% for photo in recent_photos %}<article class="memory-card panel">{% if photo.image %}<img src="{{ photo.image.url }}" alt="{{ photo.caption|default:'Travel memory' }}" data-fullscreen-photo tabindex="0" role="button" aria-label="View full-size photo: {{ photo.caption|default:'Travel memory' }}">{% else %}<div class="memory-placeholder" aria-hidden="true">✧</div>{% endif %}<div class="memory-card-body"><small>New from your circle · {{ photo.created_at|timesince }} ago</small><h2>{{ photo.caption|default:"A new story from the road" }}</h2><p>{% if photo.place %}{{ photo.place.name }}{% else %}{{ photo.travel.title }}{% endif %}</p>{% if request.user.is_authenticated and photo.author_id == request.user.id %}<details class="owner-controls"><summary aria-label="Post options">•••</summary><div class="owner-menu"><form method="post" action="{% url 'edit_photo_caption' photo.id %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><input name="caption" value="{{ photo.caption }}" maxlength="255" aria-label="Edit caption"><button type="submit">Save caption</button></form><form method="post" action="{% url 'delete_photo' photo.id %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="danger-action" type="submit">Delete post</button></form></div></details>{% endif %}</div></article>{% empty %}<div class="empty-page panel"><h2>Your circle is quiet for now.</h2><p>Add memories to start your community feed.</p></div>{% endfor %}</div></section>
+  <section class="discover-section panel circle-tab-panel" id="discover" hidden><div class="panel-heading"><div><p class="eyebrow">DAILY DISCOVER</p><h2>Places near you</h2></div><span class="dot"></span></div><p class="discover-status" data-discover-status>Allow location access to find today's nearby recommendations.</p><div class="discover-grid" data-discover-grid><div class="discover-empty">Finding places worth the trip…</div></div></section>
+  <script>
+    const discoverStatus = document.querySelector("[data-discover-status]");
+    const discoverGrid = document.querySelector("[data-discover-grid]");
+    const showDiscover = (data) => {
+      discoverStatus.textContent = `Today's picks near ${data.area}.`;
+      discoverGrid.replaceChildren();
+      if (!data.places.length) {
+        const empty = document.createElement("div");
+        empty.className = "discover-empty";
+        empty.textContent = "No nearby places were found today.";
+        discoverGrid.append(empty);
+        return;
+      }
+      data.places.forEach((place) => {
+        const card = document.createElement("article");
+        card.className = "discover-card";
+        card.tabIndex = 0;
+        card.setAttribute("role", "link");
+        card.setAttribute("aria-label", `View ${place.name} on the map`);
+        const openMap = () => {
+          window.location.href = `{% url 'map' %}?name=${encodeURIComponent(place.name)}&latitude=${place.latitude}&longitude=${place.longitude}`;
+        };
+        card.addEventListener("click", openMap);
+        card.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            openMap();
+          }
+        });
+        const icon = document.createElement("span");
+        icon.className = "discover-card-icon";
+        icon.textContent = "⌖";
+        const body = document.createElement("div");
+        const name = document.createElement("strong");
+        name.textContent = place.name;
+        const meta = document.createElement("small");
+        meta.textContent = `${place.category} · ${place.city}`;
+        body.append(name, meta);
+        card.append(icon, body);
+        discoverGrid.append(card);
+      });
+    };
+    const showDiscoverError = () => {
+      discoverStatus.textContent = "Location access is needed for nearby recommendations.";
+      discoverGrid.innerHTML = '<div class="discover-empty">Enable location access and refresh to discover places near you.</div>';
+    };
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(({coords}) => {
+        fetch(`{% url 'nearby_recommendations' %}?latitude=${coords.latitude}&longitude=${coords.longitude}`)
+          .then((response) => response.ok ? response.json() : Promise.reject())
+          .then(showDiscover)
+          .catch(showDiscoverError);
+      }, showDiscoverError, {maximumAge: 86400000, timeout: 8000});
+    } else {
+      showDiscoverError();
+    }
+    const followingContent = document.querySelector("#following-content");
+    const discoverContent = document.querySelector("#discover");
+    const circleTabs = document.querySelectorAll("[data-circle-tab]");
+    const switchCircleTab = (name, updateUrl = true) => {
+      const showDiscover = name === "discover";
+      const nextContent = showDiscover ? discoverContent : followingContent;
+      followingContent.hidden = showDiscover;
+      discoverContent.hidden = !showDiscover;
+      nextContent.classList.add("tab-entering");
+      requestAnimationFrame(() => nextContent.classList.remove("tab-entering"));
+      circleTabs.forEach((item) => item.classList.toggle("active", item.dataset.circleTab === name));
+      if (updateUrl) history.replaceState(null, "", showDiscover ? "#discover" : "#circle-feed");
+    };
+    circleTabs.forEach((tab) => tab.addEventListener("click", (event) => {
+      event.preventDefault();
+      switchCircleTab(tab.dataset.circleTab);
+    }));
+    switchCircleTab(window.location.hash === "#discover" ? "discover" : "following", false);
+  </script>
+{% endblock %}

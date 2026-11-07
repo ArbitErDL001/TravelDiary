@@ -1,0 +1,113 @@
+{% extends "diary/base.html" %}
+{% block title %}Account settings — Roam{% endblock %}
+{% block breadcrumb %}Account settings{% endblock %}
+{% block content %}
+  <style>
+    .avatar-upload{display:grid;gap:8px;margin-bottom:22px}
+    .avatar-upload-label{font-size:11px;font-weight:600}
+    .avatar-upload-card{display:flex;align-items:center;gap:13px;padding:12px;border:1px dashed #d9ccea;border-radius:14px;background:#faf8fe}
+    .cover-upload-preview{display:block;width:100%;height:90px;flex-shrink:0;overflow:hidden;border:1px solid #e7e0ef;border-radius:10px;background:linear-gradient(120deg,#ded0f5,#8b68c9 58%,#46315e)}
+    .cover-upload-preview img{width:100%;height:100%;object-fit:cover}
+    .avatar-upload-preview{display:grid;place-items:center;width:48px;height:48px;flex-shrink:0;overflow:hidden;border-radius:50%;background:#eee5fb;color:var(--purple);font-size:18px;font-weight:700}
+    .avatar-upload-preview img{width:100%;height:100%;object-fit:cover}
+    .avatar-upload-copy{min-width:0;flex:1}
+    .avatar-upload-copy strong{display:block;font-size:11px}
+    .avatar-upload-copy small{display:block;margin-top:3px;color:var(--muted);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .avatar-upload-button{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:0 11px;border-radius:9px;background:var(--purple);color:#fff;font-size:10px;font-weight:600;cursor:pointer}
+    .avatar-upload-button:hover{background:#6033b4}
+    .avatar-upload input{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  </style>
+  <section class="page-hero"><div><p class="eyebrow">YOUR ACCOUNT</p><h1>Account <span>settings.</span></h1><p>Keep your profile details and account preferences up to date.</p></div></section>
+  <div class="settings-layout">
+    <nav class="settings-nav" aria-label="Settings navigation">
+      <a class="active" href="#personal-information">Personal information</a>
+      <a href="#account-management">Account management</a>
+      <small>roam. · Your travel diary</small>
+    </nav>
+    <div class="settings-stack">
+      <section class="settings-card panel" id="personal-information">
+        <div class="settings-heading"><span class="avatar">{% if user_avatar %}<img src="{{ user_avatar }}" alt="Profile photo">{% else %}{{ user_initials }}{% endif %}</span><div><h2>Personal information</h2><small>@{{ request.user.username }}</small></div><span class="settings-badge">Active</span></div>
+        <p class="settings-intro">The details shown on your Roam profile.</p>
+        <form method="post" enctype="multipart/form-data">
+          {% csrf_token %}
+          <div class="avatar-upload">
+            <span class="avatar-upload-label">Profile photo</span>
+            <div class="avatar-upload-card">
+              <span class="avatar-upload-preview" id="avatar-preview">
+                {% if user_avatar %}<img src="{{ user_avatar }}" alt="Current profile photo">{% else %}{{ user_initials }}{% endif %}
+              </span>
+              <span class="avatar-upload-copy">
+                <strong>Choose a photo</strong>
+                <small id="avatar-file-name">JPG, PNG, or WebP · Max 5 MB</small>
+              </span>
+              <label class="avatar-upload-button" for="avatar-input">
+                Browse
+                <input id="avatar-input" type="file" name="avatar" accept="image/jpeg,image/png,image/webp">
+              </label>
+            </div>
+          </div>
+          <div class="avatar-upload">
+            <span class="avatar-upload-label">Profile background</span>
+            <div class="cover-upload-preview" id="cover-preview">
+              {% if profile.cover_image %}<img src="{{ profile.cover_image.url }}" alt="Current profile background">{% endif %}
+            </div>
+            <div class="avatar-upload-card">
+              <span class="avatar-upload-copy">
+                <strong>Choose a background image</strong>
+                <small id="cover-file-name">JPG, PNG, or WebP · Max 5 MB</small>
+              </span>
+              <label class="avatar-upload-button" for="cover-input">
+                Browse
+                <input id="cover-input" type="file" name="cover_image" accept="image/jpeg,image/png,image/webp">
+              </label>
+            </div>
+          </div>
+          <div class="settings-form-row">
+            <label>First name<input name="first_name" value="{{ request.user.first_name }}" autocomplete="given-name"></label>
+            <label>Last name<input name="last_name" value="{{ request.user.last_name }}" autocomplete="family-name"></label>
+          </div>
+          <label>Email address<input type="email" name="email" value="{{ request.user.email }}" placeholder="you@example.com" autocomplete="email"></label>
+          <div class="settings-form-actions">
+            <small>Changes update your profile immediately.</small>
+            <button class="primary-button" type="submit">Save changes</button>
+          </div>
+        </form>
+      </section>
+      <section class="settings-card panel" id="account-management">
+        <div class="settings-section-heading"><h2>Account management</h2><small>Manage your Roam account</small></div>
+        <div class="setting-row"><div><strong>Email address</strong><p>{{ request.user.email|default:"No email address added" }}</p></div><span class="settings-status">Account email</span></div>
+        <div class="setting-row"><div><strong>Member since</strong><p>Keep exploring and collecting memories.</p></div><span class="settings-status">{{ request.user.date_joined|date:"M Y" }}</span></div>
+        <div class="setting-row"><div><strong>View your profile</strong><p>See how your profile appears to your circle.</p></div><a class="settings-action" href="{% url 'profile' %}">Open <span>→</span></a></div>
+        <div class="setting-row"><div><strong>Sign out</strong><p>End your current Roam session on this device.</p></div><a class="settings-action" href="{% url 'logout' %}">Log out <span>→</span></a></div>
+      </section>
+    </div>
+  </div>
+  <script>
+    const avatarInput = document.querySelector("#avatar-input");
+    const avatarPreview = document.querySelector("#avatar-preview");
+    const avatarFileName = document.querySelector("#avatar-file-name");
+    const coverInput = document.querySelector("#cover-input");
+    const coverPreview = document.querySelector("#cover-preview");
+    const coverFileName = document.querySelector("#cover-file-name");
+    avatarInput.addEventListener("change", () => {
+      const [file] = avatarInput.files;
+      if (!file) return;
+      avatarFileName.textContent = file.name;
+      const reader = new FileReader();
+      reader.addEventListener("load", () => {
+        avatarPreview.innerHTML = `<img src="${reader.result}" alt="Selected profile photo">`;
+      });
+      reader.readAsDataURL(file);
+    });
+    coverInput.addEventListener("change", () => {
+      const [file] = coverInput.files;
+      if (!file) return;
+      coverFileName.textContent = file.name;
+      const reader = new FileReader();
+      reader.addEventListener("load", () => {
+        coverPreview.innerHTML = `<img src="${reader.result}" alt="Selected profile background">`;
+      });
+      reader.readAsDataURL(file);
+    });
+  </script>
+{% endblock %}

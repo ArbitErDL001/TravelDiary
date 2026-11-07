@@ -1,0 +1,38 @@
+<article class="profile-post-view" data-profile-post data-photo-id="{{ photo.id }}">
+  <div class="profile-post-media">
+    {% if photo.image %}<button class="profile-post-image-button" type="button" data-fullscreen-photo aria-label="View full-size photo"><img src="{{ photo.image.url }}" alt="{{ photo.caption|default:'Travel memory' }}"></button>{% else %}<div class="memory-placeholder" aria-hidden="true">✧</div>{% endif %}
+  </div>
+  <div class="profile-post-details">
+    <header class="profile-post-author">
+      <span class="avatar soft">{% if photo.author and photo.author.travel_profile.avatar %}<img src="{{ photo.author.travel_profile.avatar.url }}" alt="">{% elif photo.author %}{{ photo.author.first_name|slice:":1" }}{{ photo.author.last_name|slice:":1" }}{% else %}✧{% endif %}</span>
+      <div><strong>{% if photo.author %}{{ photo.author.get_full_name|default:photo.author.username }}{% else %}Traveler{% endif %}</strong><small>{{ photo.created_at|date:"M j, Y" }}</small></div>
+    </header>
+    <div class="profile-post-copy">
+      <h2>{{ photo.caption|default:"A moment worth remembering" }}</h2>
+      <p>{{ photo.travel.title }}{% if photo.place %} · {{ photo.place.name }}{% endif %}</p>
+    </div>
+    <button class="profile-post-like{% if request.user in photo.likes.all %} liked{% endif %}" type="button" data-profile-post-like data-photo-id="{{ photo.id }}" aria-pressed="{% if request.user in photo.likes.all %}true{% else %}false{% endif %}">
+      <svg><use href="#heart"/></svg><span data-like-count>{{ photo.likes.count }}</span> likes
+    </button>
+    <section class="profile-post-comments-section" aria-label="Comments">
+      <h3>Comments</h3>
+      <div class="profile-post-comments" data-profile-post-comments>
+        {% for comment in photo.comments.all %}
+          {% if not comment.parent_id %}
+            <article class="profile-post-comment"><strong>{% if comment.author %}{{ comment.author.username }}{% elif comment.guest_name %}{{ comment.guest_name }}{% else %}Guest{% endif %}</strong><p>{{ comment.body }}</p></article>
+            {% for reply in comment.replies.all %}<article class="profile-post-comment profile-post-reply"><strong>{% if reply.author %}{{ reply.author.username }}{% elif reply.guest_name %}{{ reply.guest_name }}{% else %}Guest{% endif %}</strong><p>{{ reply.body }}</p></article>{% endfor %}
+          {% endif %}
+        {% empty %}<p class="profile-post-empty">No comments yet. Start the conversation.</p>
+        {% endfor %}
+      </div>
+      {% if request.user.is_authenticated %}
+        <form class="profile-post-comment-form" data-profile-post-comment-form>
+          <label class="profile-post-comment-label" for="profile-post-comment-{{ photo.id }}">Write a comment</label>
+          <textarea id="profile-post-comment-{{ photo.id }}" name="body" maxlength="1000" placeholder="Write a comment..." required></textarea>
+          <button type="submit">Post</button>
+        </form>
+      {% endif %}
+      <p class="profile-post-status" data-post-status role="status" aria-live="polite"></p>
+    </section>
+  </div>
+</article>

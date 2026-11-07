@@ -1,0 +1,193 @@
+{% extends "diary/base.html" %}
+{% block title %}{% if profile_user %}{{ profile_user.get_full_name|default:profile_user.username }}{% else %}Profile{% endif %} — Roam{% endblock %}
+{% block breadcrumb %}Profile{% endblock %}
+{% block content %}
+  <div class="profile-page">
+    {% if not profile_user %}
+      <section class="empty-page panel"><span class="sparkle">✧</span><h2>Log in to view your profile.</h2><p>Your profile and memories will appear here after you sign in.</p><a class="primary-button" href="{% url 'login' %}?next=/profile/">Log in</a></section>
+    {% else %}
+      <section class="profile-header panel{% if profile_cover %} has-profile-cover{% endif %}" aria-labelledby="profile-name"{% if profile_cover %} style="--profile-cover: url('{{ profile_cover }}')"{% endif %}>
+        <div class="profile-avatar avatar">{% if profile_avatar %}<img src="{{ profile_avatar }}" alt="Profile photo">{% else %}{{ profile_user.first_name|slice:":1" }}{{ profile_user.last_name|slice:":1" }}{% endif %}</div>
+        <div class="profile-copy">
+          <div class="profile-title">
+            <div>
+              <p class="eyebrow">YOUR ROAM PROFILE</p>
+              <h1 id="profile-name">{{ profile_user.get_full_name|default:profile_user.username }}</h1>
+              <p class="profile-handle">@{{ profile_user.username }}</p>
+            </div>
+            {% if is_profile_owner %}<a class="secondary-button" href="{% url 'settings' %}">Edit profile</a>{% elif guest_profile %}<a class="secondary-button" href="{% url 'login' %}?next=/profile/{{ profile_user.id }}/">Log in to follow</a>{% endif %}
+          </div>
+          <p class="profile-bio">Collecting small moments and beautiful places.</p>
+          {% if is_profile_owner %}<div class="profile-stats" aria-label="Profile statistics">
+            <span><strong>{{ posted_count }}</strong> posts</span>
+            <span><strong>{{ friend_count }}</strong> friends</span>
+            <span><strong>{{ liked_photos|length }}</strong> liked</span>
+          </div>{% endif %}
+        </div>
+      </section>
+
+      {% if is_profile_owner or is_profile_friend %}<nav class="profile-tabs" aria-label="Profile sections">
+        <a class="active" href="#posted">Posted</a>
+        {% if is_profile_owner %}<a href="#liked">Liked</a>{% endif %}
+      </nav>
+
+        {% if is_profile_owner %}<section class="profile-section profile-circle-section" aria-labelledby="profile-circle-title">
+          <div class="section-title"><h2 id="profile-circle-title">Your circle</h2><a href="{% url 'friends' %}">Manage friends →</a></div>
+          <div class="profile-circle-grid">
+            <section class="profile-circle-panel panel" aria-labelledby="profile-friends-title">
+              <div class="panel-heading"><h3 id="profile-friends-title">Friends &amp; following</h3><span>{{ profile_connections|length }}</span></div>
+              {% for connection in profile_connections %}
+                <div class="profile-person-row">
+                  <a class="friend-profile-link" href="{% url 'public_profile' connection.user.id %}"><span class="avatar soft">{% if connection.user.travel_profile.avatar %}<img src="{{ connection.user.travel_profile.avatar.url }}" alt="{{ connection.user.get_full_name|default:connection.user.username }}">{% else %}{{ connection.user.first_name|slice:":1" }}{{ connection.user.last_name|slice:":1" }}{% endif %}</span><span><strong>{{ connection.user.get_full_name|default:connection.user.username }}</strong><small>@{{ connection.user.username }}</small></span></a>
+                  <span class="profile-connection-status">{{ connection.status }}</span>
+                </div>
+              {% empty %}<p class="profile-circle-empty">Your circle is ready to grow.</p>{% endfor %}
+            </section>
+            <section class="profile-circle-panel panel" aria-labelledby="profile-recommendations-title">
+              <div class="panel-heading"><h3 id="profile-recommendations-title">People you may know</h3><span>✧</span></div>
+              {% for person in profile_recommendations %}
+                <div class="profile-person-row">
+                  <a class="friend-profile-link" href="{% url 'public_profile' person.id %}"><span class="avatar soft">{% if person.travel_profile.avatar %}<img src="{{ person.travel_profile.avatar.url }}" alt="{{ person.get_full_name|default:person.username }}">{% else %}{{ person.first_name|slice:":1" }}{{ person.last_name|slice:":1" }}{% endif %}</span><span><strong>{{ person.get_full_name|default:person.username }}</strong><small>@{{ person.username }}</small></span></a>
+                  <form method="post" action="{% url 'add_friend' person.id %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.path }}"><button class="follow-button" type="submit">Follow</button></form>
+                </div>
+              {% empty %}<p class="profile-circle-empty">You're connected with everyone for now.</p>{% endfor %}
+              <a class="profile-recommendations-more" href="{% url 'friends' %}">See all recommendations →</a>
+            </section>
+          </div>
+        </section>{% endif %}
+
+        <section class="profile-section" id="posted" aria-labelledby="posted-title">
+          <div class="section-title"><h2 id="posted-title">Posted memories</h2><small>{% if is_profile_owner %}Stories you shared{% else %}{{ profile_user.get_full_name|default:profile_user.username }}'s shared stories{% endif %}</small></div>
+          <div class="profile-grid">
+            {% for photo in posted_photos %}
+              <article class="profile-photo panel">
+                {% if photo.image %}<img src="{{ photo.image.url }}" alt="{{ photo.caption|default:'Travel memory' }}">{% else %}<div class="memory-placeholder" aria-hidden="true">✧</div>{% endif %}
+                <div class="profile-photo-copy"><strong>{{ photo.caption|default:"A moment worth remembering" }}</strong><small>{{ photo.travel.title }}</small>{% if is_profile_owner %}<details class="owner-controls"><summary aria-label="Post options">•••</summary><div class="owner-menu"><form method="post" action="{% url 'edit_photo_caption' photo.id %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><input name="caption" value="{{ photo.caption }}" maxlength="255" aria-label="Edit caption"><button type="submit">Save caption</button></form><form method="post" action="{% url 'delete_photo' photo.id %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="danger-action" type="submit">Delete post</button></form></div></details>{% endif %}</div>
+                <button class="profile-photo-link" type="button" data-profile-post-open aria-label="Open post: {{ photo.caption|default:'A moment worth remembering' }}"></button>
+                <template class="profile-post-template">{% include "diary/profile_post_content.html" with photo=photo %}</template>
+              </article>
+            {% empty %}
+              <div class="empty-page panel"><span class="sparkle">✧</span><h2>No posts yet.</h2><p>Share your first travel memory with your circle.</p><a class="primary-button" href="{% url 'add_memory' %}">Create a post</a></div>
+            {% endfor %}
+          </div>
+        </section>
+
+        {% if is_profile_owner %}<section class="profile-section" id="liked" aria-labelledby="liked-title">
+          <div class="section-title"><h2 id="liked-title">Liked memories</h2><small>Stories that inspired you</small></div>
+          <div class="profile-grid">
+            {% for photo in liked_photos %}
+              <article class="profile-photo panel">
+                {% if photo.image %}<img src="{{ photo.image.url }}" alt="{{ photo.caption|default:'Travel memory' }}">{% else %}<div class="memory-placeholder" aria-hidden="true">♡</div>{% endif %}
+                <div><strong>{{ photo.caption|default:"A moment worth remembering" }}</strong><small>{{ photo.travel.title }}</small></div>
+                <button class="profile-photo-link" type="button" data-profile-post-open aria-label="Open post: {{ photo.caption|default:'A moment worth remembering' }}"></button>
+                <template class="profile-post-template">{% include "diary/profile_post_content.html" with photo=photo %}</template>
+              </article>
+            {% empty %}
+              <div class="empty-page panel"><span class="sparkle">♡</span><h2>No liked memories yet.</h2><p>Like a post and it will appear here.</p><a class="primary-button" href="{% url 'dashboard' %}">Explore feed</a></div>
+            {% endfor %}
+          </div>
+        </section>
+          <section class="profile-section profile-crud-section" id="your-data" aria-labelledby="your-data-title">
+            <div class="section-title"><div><h2 id="your-data-title">Your travel data</h2><small>Private records visible only to you</small></div></div>
+            <div class="profile-crud-grid">
+              {% for record in profile_crud %}
+                <article class="profile-crud-card panel">
+                  <div><a class="profile-crud-title" href="{% url 'profile_data' record.slug %}"><strong>{{ record.label }}</strong></a><small>{{ record.count }} record{{ record.count|pluralize }}</small></div>
+                  <span class="profile-crud-count">{{ record.count }}</span>
+                  {% if record.count %}
+                    {% if record.label == "Journeys" %}
+                      <ul class="profile-travel-records">{% for item in record.items %}<li><span>{{ item.title }} <small>{{ item.start_date }} – {{ item.end_date }}</small></span><a href="{% url 'edit_travel' item.id %}">Edit</a><form method="post" action="{% url 'delete_travel' item.id %}" onsubmit="return confirm('Delete this journey and its itinerary data?')">{% csrf_token %}<button class="danger-action" type="submit">Delete</button></form></li>{% endfor %}</ul>
+                    {% else %}
+                      <ul>{% for item in record.items|slice:":3" %}<li>{{ item }}</li>{% endfor %}</ul>
+                    {% endif %}
+                  {% else %}<p>No records yet.</p>{% endif %}
+                  <a class="profile-crud-manage" href="{% url 'profile_data' record.slug %}">Manage records <span aria-hidden="true">→</span></a>
+                </article>
+              {% endfor %}
+            </div>
+          </section>
+        {% endif %}
+      {% else %}
+        <section class="empty-page panel profile-private"><span class="sparkle">◉</span><h2>This profile is private.</h2><p>{{ profile_user.get_full_name|default:profile_user.username }} shares posts with accepted friends only. Their journeys, saved places, and account details remain private.</p></section>
+      {% endif %}
+      {% if is_profile_owner or is_profile_friend %}<dialog class="profile-post-dialog" data-profile-post-dialog aria-label="Travel post">
+        <button class="profile-post-close" type="button" data-profile-post-close aria-label="Close post">×</button>
+        <div data-profile-post-dialog-content></div>
+      </dialog>
+      <script>
+        (() => {
+          const dialog = document.querySelector("[data-profile-post-dialog]");
+          const content = dialog?.querySelector("[data-profile-post-dialog-content]");
+          const csrfToken = decodeURIComponent(document.cookie.split("; ").find((row) => row.startsWith("csrftoken="))?.split("=")[1] || "");
+          document.querySelectorAll("[data-profile-post-open]").forEach((button) => {
+            button.addEventListener("click", () => {
+              const template = button.closest(".profile-photo").querySelector(".profile-post-template");
+              content.replaceChildren(template.content.cloneNode(true));
+              dialog.showModal();
+            });
+          });
+          dialog?.querySelector("[data-profile-post-close]")?.addEventListener("click", () => dialog.close());
+          dialog?.addEventListener("click", (event) => {
+            if (event.target === dialog) dialog.close();
+          });
+          dialog?.addEventListener("click", async (event) => {
+            const likeButton = event.target.closest("[data-profile-post-like]");
+            if (likeButton) {
+              likeButton.disabled = true;
+              try {
+                const response = await fetch(`/api/photos/${likeButton.dataset.photoId}/like/`, {
+                  method: "POST",
+                  headers: {"X-CSRFToken": csrfToken},
+                  credentials: "same-origin",
+                });
+                if (!response.ok) throw new Error("Could not update the like.");
+                const result = await response.json();
+                likeButton.querySelector("[data-like-count]").textContent = result.like_count;
+                likeButton.setAttribute("aria-pressed", String(result.liked));
+                likeButton.classList.toggle("liked", result.liked);
+              } catch (error) {
+                const status = content.querySelector("[data-post-status]");
+                status.textContent = error.message;
+              } finally {
+                likeButton.disabled = false;
+              }
+            }
+          });
+          dialog?.addEventListener("submit", async (event) => {
+            const form = event.target.closest("[data-profile-post-comment-form]");
+            if (!form) return;
+            event.preventDefault();
+            const body = form.elements.body.value.trim();
+            if (!body) return;
+            const post = content.querySelector("[data-profile-post]");
+            const status = content.querySelector("[data-post-status]");
+            const list = content.querySelector("[data-profile-post-comments]");
+            try {
+              const response = await fetch("/api/photo-comments/", {
+                method: "POST",
+                headers: {"Content-Type": "application/json", "X-CSRFToken": csrfToken},
+                credentials: "same-origin",
+                body: JSON.stringify({photo: post.dataset.photoId, body}),
+              });
+              if (!response.ok) throw new Error("Could not post your comment.");
+              const comment = await response.json();
+              list.querySelector(".profile-post-empty")?.remove();
+              const item = document.createElement("article");
+              item.className = "profile-post-comment";
+              const author = document.createElement("strong");
+              author.textContent = comment.author_name;
+              const text = document.createElement("p");
+              text.textContent = comment.body;
+              item.append(author, text);
+              list.append(item);
+              form.reset();
+              status.textContent = "Comment posted.";
+            } catch (error) {
+              status.textContent = error.message;
+            }
+          });
+        })();
+      </script>{% endif %}
+    {% endif %}
+  </div>
+{% endblock %}

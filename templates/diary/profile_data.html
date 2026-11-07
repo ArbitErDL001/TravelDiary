@@ -1,0 +1,52 @@
+{% extends "diary/base.html" %}
+{% block title %}{{ category_label }} — Your travel data — Roam{% endblock %}
+{% block breadcrumb %}Your travel data / {{ category_label }}{% endblock %}
+{% block content %}
+  <section class="travel-data-page" data-travel-data-page>
+    <header class="travel-data-heading">
+      <div><p class="eyebrow">PRIVATE TO YOUR ACCOUNT</p><h1>Your travel data</h1><p>Manage your {{ category_label|lower }} without sharing them with other accounts.</p></div>
+      <a class="secondary-button" href="{% url 'profile' %}#your-data">Back to profile</a>
+    </header>
+    <nav class="travel-data-tabs" aria-label="Travel data categories">
+      {% for tab in tabs %}<a class="{% if tab.active %}active{% endif %}" href="{% url 'profile_data' tab.slug %}" data-travel-data-tab{% if tab.active %} aria-current="page"{% endif %}>{{ tab.label }}</a>{% endfor %}
+    </nav>
+    <p class="travel-data-status" role="status" aria-live="polite"></p>
+    <div class="travel-data-layout">
+      <section class="travel-data-form panel">
+        <div class="section-title"><div><h2>{% if editing_item %}Edit private {{ category_label|lower }} record{% elif editing %}Edit{% else %}Add{% endif %} {{ category_label|lower }}</h2><small>Your changes are private to this account</small></div></div>
+        <form method="post" enctype="multipart/form-data" class="travel-data-fields">
+          {% csrf_token %}
+          {{ form.non_field_errors }}
+          {{ form.as_p }}
+          <div class="travel-data-actions"><button class="primary-button" type="submit">{% if editing %}Save changes{% else %}Add {{ category_label|lower }}{% endif %}</button>{% if editing %}<a class="secondary-button" href="{% url 'profile_data' category %}">Cancel</a>{% endif %}</div>
+        </form>
+      </section>
+      <section class="travel-data-records">
+        <div class="section-title"><div><h2>{{ category_label }}</h2><small>{{ entries|length }} record{{ entries|length|pluralize }}</small></div></div>
+        {% if category == "countries" %}
+          {% for entry in entries %}
+            <article class="travel-data-record panel"><div class="travel-data-record-copy"><strong>{{ entry.item.name }}</strong>{% if entry.parent %}<small>{{ entry.parent.title }}</small>{% else %}<small>Private country</small>{% endif %}</div>{% if entry.item.owner_id == request.user.id %}<a class="record-edit" href="{% url 'profile_data_item_edit' category entry.item.id %}">Edit country</a><form method="post" action="{% url 'profile_data_item_delete' category entry.item.id %}" onsubmit="return confirm('Delete this private country and its region links?')">{% csrf_token %}<button class="record-delete" type="submit">Delete</button></form>{% endif %}{% if entry.parent %}<a class="record-edit" href="{% url 'profile_data_edit' category entry.parent.id %}">Edit trip</a><form method="post" action="{% url 'profile_data_delete' category entry.parent.id %}">{% csrf_token %}<input type="hidden" name="country_id" value="{{ entry.item.id }}"><button class="record-delete" type="submit">Remove</button></form>{% endif %}</article>
+          {% empty %}<div class="empty-page panel"><span class="sparkle">✧</span><h2>No countries linked yet.</h2><p>Add countries to one of your journeys using the form.</p></div>{% endfor %}
+        {% elif category == "regions" %}
+          {% for entry in entries %}
+            <article class="travel-data-record panel"><div class="travel-data-record-copy"><strong>{{ entry.item.name }}</strong>{% if entry.parent %}<small>{{ entry.item.country.name }} · {{ entry.parent.name }}</small>{% else %}<small>Private region</small>{% endif %}</div>{% if entry.item.owner_id == request.user.id %}<a class="record-edit" href="{% url 'profile_data_item_edit' category entry.item.id %}">Edit region</a><form method="post" action="{% url 'profile_data_item_delete' category entry.item.id %}" onsubmit="return confirm('Delete this private region?')">{% csrf_token %}<button class="record-delete" type="submit">Delete</button></form>{% endif %}{% if entry.parent %}<a class="record-edit" href="{% url 'profile_data_edit' category entry.parent.id %}">Edit place</a><form method="post" action="{% url 'profile_data_delete' category entry.parent.id %}">{% csrf_token %}<button class="record-delete" type="submit">Unlink</button></form>{% endif %}</article>
+          {% empty %}<div class="empty-page panel"><span class="sparkle">✧</span><h2>No regions linked yet.</h2><p>Connect a region to one of your saved places using the form.</p></div>{% endfor %}
+        {% elif category == "tags" %}
+          {% for entry in entries %}
+            <article class="travel-data-record panel"><div class="travel-data-record-copy"><strong>{{ entry.item.name }}</strong>{% if entry.parent %}<small>{{ entry.parent.title }}</small>{% else %}<small>Private tag</small>{% endif %}</div>{% if entry.item.owner_id == request.user.id %}<a class="record-edit" href="{% url 'profile_data_item_edit' category entry.item.id %}">Edit tag</a><form method="post" action="{% url 'profile_data_item_delete' category entry.item.id %}" onsubmit="return confirm('Delete this private tag?')">{% csrf_token %}<button class="record-delete" type="submit">Delete</button></form>{% endif %}{% if entry.parent %}<a class="record-edit" href="{% url 'profile_data_edit' category entry.parent.id %}">Edit trip</a><form method="post" action="{% url 'profile_data_delete' category entry.parent.id %}">{% csrf_token %}<input type="hidden" name="tag_id" value="{{ entry.item.id }}"><button class="record-delete" type="submit">Remove</button></form>{% endif %}</article>
+          {% empty %}<div class="empty-page panel"><span class="sparkle">✧</span><h2>No tags linked yet.</h2><p>Add tags to one of your journeys using the form.</p></div>{% endfor %}
+        {% else %}
+          {% for entry in entries %}
+            <article class="travel-data-record panel">
+              <div class="travel-data-record-copy"><strong>{% if category == "photos" %}{{ entry.item.caption|default:"Travel photo" }}{% else %}{{ entry.item }}{% endif %}</strong>
+                {% if category == "photos" %}<small>{{ entry.item.travel.title }}{% if entry.item.taken_on %} · {{ entry.item.taken_on }}{% endif %}</small>{% elif category == "journeys" %}<small>{{ entry.item.start_date }} – {{ entry.item.end_date }} · {{ entry.item.get_status_display }}</small>{% endif %}
+              </div>
+              <a class="record-edit" href="{% url 'profile_data_edit' category entry.item.id %}">Edit</a>
+              <form method="post" action="{% url 'profile_data_delete' category entry.item.id %}" onsubmit="return confirm('Delete this record?')">{% csrf_token %}<button class="record-delete" type="submit">Delete</button></form>
+            </article>
+          {% empty %}<div class="empty-page panel"><span class="sparkle">✧</span><h2>No {{ category_label|lower }} yet.</h2><p>Add your first record using the form.</p></div>{% endfor %}
+        {% endif %}
+      </section>
+    </div>
+  </section>
+{% endblock %}

@@ -1,0 +1,13 @@
+{% extends "diary/base.html" %}
+{% block title %}Journeys — Roam{% endblock %}
+{% block breadcrumb %}Journeys{% endblock %}
+{% block content %}
+  <section class="page-hero"><div><p class="eyebrow">YOUR ADVENTURES</p><h1>All your <span>journeys</span></h1><p>Plan the next chapter or revisit the roads behind you.</p></div><a class="primary-button" href="{% url 'add_journey' %}"><span>＋</span> New journey</a></section>
+  <section class="stats journey-stats" aria-label="Journey overview"><div class="stat"><span class="stat-icon">↗</span><div><strong>{{ journeys|length }}</strong><small>Journeys</small></div></div><div class="stat"><span class="stat-icon">◎</span><div><strong>—</strong><small>Countries</small></div></div><div class="stat"><span class="stat-icon">▧</span><div><strong>{{ journeys|length }}</strong><small>Travel plans</small></div></div></section>
+  <div class="section-heading"><h2>Your journeys</h2><small>Every adventure has a story.</small></div>
+  <section class="journey-list">
+    {% for journey in journeys %}
+      <article class="journey-row panel"><div class="journey-row-icon">↗</div><div><h2>{{ journey.title }}</h2><p>{{ journey.start_date }} – {{ journey.end_date }}</p><small>{{ journey.photos.count }} memories · {{ journey.get_status_display }}</small></div><a href="{% url 'dashboard' %}#journey">Open journey <span>→</span></a></article>
+    {% empty %}<div class="empty-page panel"><span class="sparkle">✧</span><h2>No journeys yet.</h2><p>Your first adventure can start with one journey.</p><a class="primary-button" href="{% url 'add_journey' %}">Create a journey</a></div>{% endfor %}
+  </section>
+{% endblock %}

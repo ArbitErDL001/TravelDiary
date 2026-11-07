@@ -1,0 +1,203 @@
+{% extends "diary/base.html" %}
+{% block title %}New journey — Roam{% endblock %}
+{% block breadcrumb %}New journey{% endblock %}
+{% block content %}
+  <style>
+    .country-picker{display:grid;gap:10px}
+    .country-search{width:100%;min-height:44px;padding:0 13px;border:1px solid #e8e0f0;border-radius:11px;background:#fff;color:var(--ink);outline:0}
+    .country-search:focus{border-color:var(--purple);box-shadow:0 0 0 3px #7846d620}
+    .country-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;max-height:180px;overflow:auto;padding:2px}
+    .country-option{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:40px;padding:0 11px;border:1px solid #eee8f5;border-radius:10px;background:#fff;color:var(--ink);font-size:11px;text-align:left;cursor:pointer}
+    .country-option:hover,.country-option.is-selected{border-color:var(--purple);background:#f5efff;color:var(--purple)}
+    .country-code{color:var(--muted);font-size:9px;font-weight:700;letter-spacing:.7px}
+    .country-recommendations{display:grid;gap:7px}
+    .country-recommendation{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;padding:10px 12px;border:1px solid #eee8f5;border-radius:10px;background:#fff;color:var(--ink);text-align:left;cursor:pointer}
+    .country-recommendation:hover{border-color:var(--purple);background:#f5efff}
+    .country-recommendation.is-photon{border-left:3px solid var(--purple)}
+    .country-recommendation strong{display:block;font-size:11px}
+    .country-recommendation small{margin-top:2px;color:var(--muted);font-size:10px}
+    .recommendation-label{color:var(--purple);font-size:9px;font-weight:700;letter-spacing:.6px;text-transform:uppercase}
+    .country-location{display:flex;align-items:center;gap:7px;margin:0;color:var(--muted);font-size:10px}
+    .country-location strong{color:var(--ink);font-weight:600}
+    @media(max-width:600px){.country-options{grid-template-columns:1fr}}
+  </style>
+  <section class="page-hero"><div><p class="eyebrow">NEW ADVENTURE</p><h1>Start a new <span>journey.</span></h1><p>Give your next chapter a place to begin.</p></div></section>
+  <section class="memory-form-card panel journey-form-card">
+    <div class="memory-form-intro"><span class="sparkle">✧</span><h2>Plan the route</h2><p>Add the basics now. You can fill in the memories as you travel.</p></div>
+    <form action="{% url 'add_journey' %}" method="post">
+      {% csrf_token %}
+      <label>Journey name <input id="journey-title" name="title" maxlength="200" placeholder="A week in Portugal" required></label>
+      <div class="form-row"><label>Start date <input type="date" name="start_date" required></label><label>End date <input type="date" name="end_date" required></label></div>
+      <div class="country-picker">
+        <label for="country-search">Choose country</label>
+        <input id="country-search" class="country-search" type="search" placeholder="Search countries or cities..." autocomplete="off" aria-controls="country-options">
+        <input id="country-value" type="hidden" name="country" value="">
+        <div id="country-recommendations" class="country-recommendations" aria-live="polite"></div>
+        <div id="country-options" class="country-options" role="listbox" aria-label="Countries">
+          {% for country in countries %}
+            <button class="country-option" type="button" role="option" data-id="{{ country.id }}" data-name="{{ country.name|lower }}" data-label="{{ country.name }}" data-code="{{ country.code }}">
+              <span>{{ country.name }}</span><span class="country-code">{{ country.code }}</span>
+            </button>
+          {% endfor %}
+        </div>
+        <p class="country-location" aria-live="polite"><span>⌖</span><span>Location: <strong id="country-location">Choose a country</strong></span></p>
+      </div>
+      <label>Status <select name="status"><option value="planned">Planned</option><option value="ongoing">Ongoing</option><option value="completed">Completed</option></select></label>
+      <label>Description <textarea name="description" rows="4" placeholder="What are you hoping to discover?"></textarea></label>
+      <button class="primary-button" type="submit"><span>＋</span> Create journey</button>
+    </form>
+  </section>
+  <script>
+    (() => {
+      const search = document.querySelector("#country-search");
+      const value = document.querySelector("#country-value");
+      const location = document.querySelector("#country-location");
+      const recommendations = document.querySelector("#country-recommendations");
+      const options = [...document.querySelectorAll(".country-option")];
+      const countryCodeMap = {
+        US:"USA", CA:"CAN", MX:"MEX", BR:"BRA", AR:"ARG", CL:"CHL", PE:"PER", CR:"CRI",
+        GB:"GBR", FR:"FRA", IT:"ITA", ES:"ESP", PT:"PRT", DE:"DEU", AT:"AUT", CH:"CHE",
+        NL:"NLD", BE:"BEL", CZ:"CZE", HR:"HRV", GR:"GRC", IS:"ISL", IE:"IRL", NO:"NOR",
+        SE:"SWE", TR:"TUR", MA:"MAR", EG:"EGY", ZA:"ZAF", KE:"KEN", TZ:"TZA", AE:"ARE",
+        JO:"JOR", IN:"IND", NP:"NPL", LK:"LKA", TH:"THA", VN:"VNM", KH:"KHM", MY:"MYS",
+        ID:"IDN", PH:"PHL", KR:"KOR", CN:"CHN", SG:"SGP", JP:"JPN", AU:"AUS", NZ:"NZL"
+      };
+      const countryRecommendations = [
+        ["Japan", "Tokyo", "JPN"], ["France", "Paris", "FRA"], ["Italy", "Rome", "ITA"],
+        ["Portugal", "Lisbon", "PRT"], ["United Kingdom", "London", "GBR"],
+        ["United States", "New York", "USA"], ["Australia", "Sydney", "AUS"],
+        ["South Africa", "Cape Town", "ZAF"], ["Brazil", "Rio de Janeiro", "BRA"],
+        ["Singapore", "Singapore", "SGP"]
+      ];
+
+      function selectPlace(name, country, code, place) {
+        value.value = `code:${code}`;
+        search.value = name;
+        location.textContent = `${place ? `${place} — ` : ""}${country}`;
+        options.forEach((item) => item.classList.toggle("is-selected", item.dataset.code === code));
+        recommendations.replaceChildren();
+      }
+
+      function renderPhotonRecommendations(features) {
+        features.forEach((feature) => {
+          const code = countryCodeMap[feature.country_code] || feature.country_code;
+          const place = [feature.city, feature.state].filter(Boolean).join(", ");
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "country-recommendation is-photon";
+          button.innerHTML = `<span><strong>${feature.name}</strong><small>${[place, feature.country].filter(Boolean).join(", ")}</small></span><span class="recommendation-label">Photon</span>`;
+          button.addEventListener("click", () => selectPlace(feature.name, feature.country || "Unknown country", code, place));
+          recommendations.append(button);
+        });
+      }
+
+      let photonTimer;
+      let photonRequest;
+      async function loadPhotonRecommendations(query) {
+        if (photonRequest) photonRequest.abort();
+        photonRequest = new AbortController();
+        try {
+          const response = await fetch(`{% url 'photon_search' %}?q=${encodeURIComponent(query)}`, {signal: photonRequest.signal});
+          if (!response.ok) return;
+          const data = await response.json();
+          if (search.value.trim().toLowerCase() !== query) return;
+          renderPhotonRecommendations(data.features || []);
+        } catch (error) {
+          if (error.name !== "AbortError") console.warn("Photon recommendations unavailable", error);
+        }
+      }
+
+      function filterCountries() {
+        const query = search.value.trim().toLowerCase();
+        options.forEach((option) => {
+          option.hidden = query && !option.dataset.name.includes(query) && !option.dataset.code.toLowerCase().includes(query);
+        });
+        recommendations.replaceChildren();
+        if (!query) return;
+        clearTimeout(photonTimer);
+        if (query.length >= 2) photonTimer = setTimeout(() => loadPhotonRecommendations(query), 300);
+        countryRecommendations
+          .filter(([country, location]) => `${country} ${location}`.toLowerCase().includes(query))
+          .slice(0, 4)
+          .forEach(([country, place, code]) => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "country-recommendation";
+            button.innerHTML = `<span><strong>${country}</strong><small>Recommended location: ${place}</small></span><span class="recommendation-label">${code}</span>`;
+            button.addEventListener("click", () => {
+              value.value = `code:${code}`;
+              search.value = country;
+              location.textContent = `${country} — ${place}`;
+              options.forEach((item) => item.classList.remove("is-selected"));
+              const existing = options.find((item) => item.dataset.code === code);
+              if (existing) existing.classList.add("is-selected");
+              filterCountries();
+              recommendations.replaceChildren();
+            });
+            recommendations.append(button);
+          });
+      }
+
+      options.forEach((option) => {
+        option.addEventListener("click", () => {
+          options.forEach((item) => item.classList.remove("is-selected"));
+          option.classList.add("is-selected");
+          value.value = option.dataset.id;
+          search.value = option.dataset.label;
+          location.textContent = `${option.dataset.label} (${option.dataset.code})`;
+          filterCountries();
+        });
+      });
+
+      search.addEventListener("input", filterCountries);
+
+      const journeyTitle = document.querySelector("#journey-title");
+      const titlePlaceholders = [
+        "A week in Portugal",
+        "Summer in Kyoto",
+        "Road trip through Italy",
+        "A weekend in Paris",
+        "Island hopping in Greece",
+        "Exploring New Zealand",
+        "City lights in Seoul",
+        "A coastal escape in Spain",
+        "Discovering Morocco",
+        "Mountains and memories in Switzerland"
+      ];
+      journeyTitle.placeholder = titlePlaceholders[Math.floor(Math.random() * titlePlaceholders.length)];
+
+      window.initGooglePlaces = () => {
+        if (!window.google?.maps?.places) return;
+        const autocomplete = new google.maps.places.Autocomplete(search, {
+          fields: ["address_components", "formatted_address", "geometry", "name"],
+          types: ["(regions)"]
+        });
+        autocomplete.addListener("place_changed", () => {
+          const place = autocomplete.getPlace();
+          const countryComponent = place.address_components?.find((component) => component.types.includes("country"));
+          const countryCode = countryComponent?.short_name?.toUpperCase();
+          const countryName = countryComponent?.long_name;
+          const placeName = place.name || place.formatted_address;
+          if (!countryCode || !countryName) return;
+          const alpha3 = {
+            US:"USA", CA:"CAN", MX:"MEX", BR:"BRA", AR:"ARG", CL:"CHL", PE:"PER", CR:"CRI",
+            GB:"GBR", FR:"FRA", IT:"ITA", ES:"ESP", PT:"PRT", DE:"DEU", AT:"AUT", CH:"CHE",
+            NL:"NLD", BE:"BEL", CZ:"CZE", HR:"HRV", GR:"GRC", IS:"ISL", IE:"IRL", NO:"NOR",
+            SE:"SWE", TR:"TUR", MA:"MAR", EG:"EGY", ZA:"ZAF", KE:"KEN", TZ:"TZA", AE:"ARE",
+            JO:"JOR", IN:"IND", NP:"NPL", LK:"LKA", TH:"THA", VN:"VNM", KH:"KHM", MY:"MYS",
+            ID:"IDN", PH:"PHL", KR:"KOR", CN:"CHN", SG:"SGP", JP:"JPN", AU:"AUS", NZ:"NZL"
+          };
+          value.value = `code:${alpha3[countryCode] || countryCode}`;
+          search.value = placeName;
+          location.textContent = `${placeName} — ${countryName}`;
+          options.forEach((item) => item.classList.toggle("is-selected", item.dataset.code === alpha3[countryCode]));
+          recommendations.replaceChildren();
+          filterCountries();
+        });
+      };
+    })();
+  </script>
+  {% if google_maps_api_key %}
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key|urlencode }}&libraries=places&callback=initGooglePlaces"></script>
+  {% endif %}
+{% endblock %}

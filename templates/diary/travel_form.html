@@ -1,0 +1,14 @@
+{% extends "diary/base.html" %}
+{% block title %}{% if travel %}Edit journey{% else %}Add journey{% endif %} — Roam{% endblock %}
+{% block breadcrumb %}Your travel data{% endblock %}
+{% block content %}
+  <section class="settings-page panel travel-form-page">
+    <div class="section-title"><div><p class="eyebrow">PRIVATE TO YOUR ACCOUNT</p><h1>{% if travel %}Edit journey{% else %}Add a journey{% endif %}</h1></div></div>
+    <form method="post" class="settings-form">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+      {{ form.as_p }}
+      <div class="form-actions"><button class="primary-button" type="submit">Save journey</button><a class="secondary-button" href="{% url 'profile' %}#your-data">Cancel</a></div>
+    </form>
+  </section>
+{% endblock %}

@@ -1,0 +1,10 @@
+{% extends "diary/base.html" %}
+{% block title %}Saved places — Roam{% endblock %}
+{% block breadcrumb %}Saved places{% endblock %}
+{% block content %}
+  <section class="page-hero"><div><p class="eyebrow">YOUR WISHLIST</p><h1>Somewhere, <span>someday.</span></h1><p>Keep the places that make you want to pack a bag.</p></div><a class="primary-button" href="{% url 'map' %}"><span>⌖</span> Open map</a></section>
+  <div class="page-toolbar"><div class="saved-search" role="search"><span>⌕</span><input aria-label="Search saved places" placeholder="Search your saved places"></div><nav class="page-tabs" aria-label="Saved place filters"><a class="active" href="#places">All places · {{ places|length }}</a><a href="#places">Wishlist</a></nav></div>
+  <section class="place-grid" id="places">
+    {% for place in places %}<article class="place-card panel"><div class="place-card-icon">⌖</div><div><h2>{{ place.name }}</h2><p>{% if place.region %}{{ place.region.name }}, {{ place.region.country.name }}{% else %}Saved place{% endif %}</p><small>{{ place.description|default:"A place to explore next."|truncatechars:90 }}</small></div><a href="{% url 'map' %}">View map →</a></article>{% empty %}<div class="empty-page panel"><span class="sparkle">✧</span><h2>Your map is ready.</h2><p>Add places through the map or admin to build your wishlist.</p><a class="primary-button" href="{% url 'map' %}">Explore map</a></div>{% endfor %}
+  </section>
+{% endblock %}
