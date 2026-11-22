@@ -2,31 +2,6 @@ from django.conf import settings
 from django.db import migrations
 import django.db.models
 import django.db.models.deletion
-from django.contrib.auth.hashers import make_password
-
-
-def create_test_accounts(apps, schema_editor):
-    User = apps.get_model(*settings.AUTH_USER_MODEL.split("."))
-    Friendship = apps.get_model("diary", "Friendship")
-
-    accounts = [
-        ("alex", "Alex", "Morgan"),
-        ("maya", "Maya", "Chen"),
-        ("leo", "Leo", "Brooks"),
-    ]
-    users = {}
-    for username, first_name, last_name in accounts:
-        user, created = User.objects.get_or_create(
-            username=username,
-            defaults={"first_name": first_name, "last_name": last_name},
-        )
-        if created:
-            user.password = make_password("roam1234")
-            user.save()
-        users[username] = user
-
-    Friendship.objects.get_or_create(user=users["alex"], friend=users["maya"])
-    Friendship.objects.get_or_create(user=users["maya"], friend=users["alex"])
 
 
 class Migration(migrations.Migration):
@@ -52,5 +27,4 @@ class Migration(migrations.Migration):
             model_name="friendship",
             constraint=django.db.models.UniqueConstraint(fields=("user", "friend"), name="unique_friendship"),
         ),
-        migrations.RunPython(create_test_accounts, migrations.RunPython.noop),
     ]

@@ -1,4 +1,5 @@
 {% extends "diary/base.html" %}
+{% load static %}
 {% block title %}{% if profile_user %}{{ profile_user.get_full_name|default:profile_user.username }}{% else %}Profile{% endif %} — Roam{% endblock %}
 {% block breadcrumb %}Profile{% endblock %}
 {% block content %}
@@ -17,7 +18,7 @@
             </div>
             {% if is_profile_owner %}<a class="secondary-button" href="{% url 'settings' %}">Edit profile</a>{% elif guest_profile %}<a class="secondary-button" href="{% url 'login' %}?next=/profile/{{ profile_user.id }}/">Log in to follow</a>{% endif %}
           </div>
-          <p class="profile-bio">Collecting small moments and beautiful places.</p>
+          <p class="profile-bio">{{ profile_bio|default:"Collecting small moments and beautiful places." }}</p>
           {% if is_profile_owner %}<div class="profile-stats" aria-label="Profile statistics">
             <span><strong>{{ posted_count }}</strong> posts</span>
             <span><strong>{{ friend_count }}</strong> friends</span>
@@ -56,6 +57,44 @@
           </div>
         </section>{% endif %}
 
+        {% if is_profile_owner %}<section class="profile-section profile-crud-section" id="your-data" aria-labelledby="your-data-title">
+          <div class="section-title"><div><h2 id="your-data-title">Your travel data</h2><small>Private records visible only to you</small><p class="profile-data-intro">Start with a journey, then add places and days so activities, bookings, and memories stay connected.</p></div></div>
+          <nav class="profile-data-flow" aria-label="Suggested order for organizing your travel data">
+            {% for group in profile_crud_groups %}
+              <a class="profile-data-flow-step" href="#travel-data-step-{{ group.number }}">
+                <span class="profile-data-flow-number">{{ group.number }}</span>
+                <span><strong>{{ group.title }}</strong><small>{{ group.description }}</small></span>
+                <span class="profile-data-flow-arrow" aria-hidden="true">↓</span>
+              </a>
+            {% endfor %}
+          </nav>
+          <div class="profile-crud-groups">
+            {% for group in profile_crud_groups %}
+              <section class="profile-crud-group" id="travel-data-step-{{ group.number }}" aria-labelledby="travel-data-step-title-{{ group.number }}">
+                <div class="profile-crud-group-heading">
+                  <div><span class="profile-crud-step">STEP {{ group.number }}</span><h3 id="travel-data-step-title-{{ group.number }}">{{ group.title }}</h3><p>{{ group.description }}</p></div>
+                </div>
+                <div class="profile-crud-grid">
+                  {% for record in group.records %}
+                    <article class="profile-crud-card panel">
+                      <div><a class="profile-crud-title" href="{% url 'profile_data' record.slug %}"><strong>{{ record.label }}</strong></a><small>{{ record.count }} record{{ record.count|pluralize }}</small></div>
+                      <span class="profile-crud-count">{{ record.count }}</span>
+                      {% if record.count %}
+                        {% if record.slug == "journeys" %}
+                          <ul class="profile-travel-records">{% for item in record.items %}<li><span>{{ item.title }} <small>{{ item.start_date }} – {{ item.end_date }}</small></span><a href="{% url 'edit_travel' item.id %}">Edit</a><form method="post" action="{% url 'delete_travel' item.id %}" onsubmit="return confirm('Delete this journey and its itinerary data?')">{% csrf_token %}<button class="danger-action" type="submit">Delete</button></form></li>{% endfor %}</ul>
+                        {% else %}
+                          <ul>{% for item in record.items|slice:":3" %}<li>{{ item }}</li>{% endfor %}</ul>
+                        {% endif %}
+                      {% else %}<p>No records yet.</p>{% endif %}
+                      <a class="profile-crud-manage" href="{% url 'profile_data' record.slug %}">{% if record.count %}Manage records{% else %}Add first record{% endif %} <span aria-hidden="true">→</span></a>
+                    </article>
+                  {% endfor %}
+                </div>
+              </section>
+            {% endfor %}
+          </div>
+        </section>{% endif %}
+
         <section class="profile-section" id="posted" aria-labelledby="posted-title">
           <div class="section-title"><h2 id="posted-title">Posted memories</h2><small>{% if is_profile_owner %}Stories you shared{% else %}{{ profile_user.get_full_name|default:profile_user.username }}'s shared stories{% endif %}</small></div>
           <div class="profile-grid">
@@ -87,25 +126,6 @@
             {% endfor %}
           </div>
         </section>
-          <section class="profile-section profile-crud-section" id="your-data" aria-labelledby="your-data-title">
-            <div class="section-title"><div><h2 id="your-data-title">Your travel data</h2><small>Private records visible only to you</small></div></div>
-            <div class="profile-crud-grid">
-              {% for record in profile_crud %}
-                <article class="profile-crud-card panel">
-                  <div><a class="profile-crud-title" href="{% url 'profile_data' record.slug %}"><strong>{{ record.label }}</strong></a><small>{{ record.count }} record{{ record.count|pluralize }}</small></div>
-                  <span class="profile-crud-count">{{ record.count }}</span>
-                  {% if record.count %}
-                    {% if record.label == "Journeys" %}
-                      <ul class="profile-travel-records">{% for item in record.items %}<li><span>{{ item.title }} <small>{{ item.start_date }} – {{ item.end_date }}</small></span><a href="{% url 'edit_travel' item.id %}">Edit</a><form method="post" action="{% url 'delete_travel' item.id %}" onsubmit="return confirm('Delete this journey and its itinerary data?')">{% csrf_token %}<button class="danger-action" type="submit">Delete</button></form></li>{% endfor %}</ul>
-                    {% else %}
-                      <ul>{% for item in record.items|slice:":3" %}<li>{{ item }}</li>{% endfor %}</ul>
-                    {% endif %}
-                  {% else %}<p>No records yet.</p>{% endif %}
-                  <a class="profile-crud-manage" href="{% url 'profile_data' record.slug %}">Manage records <span aria-hidden="true">→</span></a>
-                </article>
-              {% endfor %}
-            </div>
-          </section>
         {% endif %}
       {% else %}
         <section class="empty-page panel profile-private"><span class="sparkle">◉</span><h2>This profile is private.</h2><p>{{ profile_user.get_full_name|default:profile_user.username }} shares posts with accepted friends only. Their journeys, saved places, and account details remain private.</p></section>
@@ -114,80 +134,7 @@
         <button class="profile-post-close" type="button" data-profile-post-close aria-label="Close post">×</button>
         <div data-profile-post-dialog-content></div>
       </dialog>
-      <script>
-        (() => {
-          const dialog = document.querySelector("[data-profile-post-dialog]");
-          const content = dialog?.querySelector("[data-profile-post-dialog-content]");
-          const csrfToken = decodeURIComponent(document.cookie.split("; ").find((row) => row.startsWith("csrftoken="))?.split("=")[1] || "");
-          document.querySelectorAll("[data-profile-post-open]").forEach((button) => {
-            button.addEventListener("click", () => {
-              const template = button.closest(".profile-photo").querySelector(".profile-post-template");
-              content.replaceChildren(template.content.cloneNode(true));
-              dialog.showModal();
-            });
-          });
-          dialog?.querySelector("[data-profile-post-close]")?.addEventListener("click", () => dialog.close());
-          dialog?.addEventListener("click", (event) => {
-            if (event.target === dialog) dialog.close();
-          });
-          dialog?.addEventListener("click", async (event) => {
-            const likeButton = event.target.closest("[data-profile-post-like]");
-            if (likeButton) {
-              likeButton.disabled = true;
-              try {
-                const response = await fetch(`/api/photos/${likeButton.dataset.photoId}/like/`, {
-                  method: "POST",
-                  headers: {"X-CSRFToken": csrfToken},
-                  credentials: "same-origin",
-                });
-                if (!response.ok) throw new Error("Could not update the like.");
-                const result = await response.json();
-                likeButton.querySelector("[data-like-count]").textContent = result.like_count;
-                likeButton.setAttribute("aria-pressed", String(result.liked));
-                likeButton.classList.toggle("liked", result.liked);
-              } catch (error) {
-                const status = content.querySelector("[data-post-status]");
-                status.textContent = error.message;
-              } finally {
-                likeButton.disabled = false;
-              }
-            }
-          });
-          dialog?.addEventListener("submit", async (event) => {
-            const form = event.target.closest("[data-profile-post-comment-form]");
-            if (!form) return;
-            event.preventDefault();
-            const body = form.elements.body.value.trim();
-            if (!body) return;
-            const post = content.querySelector("[data-profile-post]");
-            const status = content.querySelector("[data-post-status]");
-            const list = content.querySelector("[data-profile-post-comments]");
-            try {
-              const response = await fetch("/api/photo-comments/", {
-                method: "POST",
-                headers: {"Content-Type": "application/json", "X-CSRFToken": csrfToken},
-                credentials: "same-origin",
-                body: JSON.stringify({photo: post.dataset.photoId, body}),
-              });
-              if (!response.ok) throw new Error("Could not post your comment.");
-              const comment = await response.json();
-              list.querySelector(".profile-post-empty")?.remove();
-              const item = document.createElement("article");
-              item.className = "profile-post-comment";
-              const author = document.createElement("strong");
-              author.textContent = comment.author_name;
-              const text = document.createElement("p");
-              text.textContent = comment.body;
-              item.append(author, text);
-              list.append(item);
-              form.reset();
-              status.textContent = "Comment posted.";
-            } catch (error) {
-              status.textContent = error.message;
-            }
-          });
-        })();
-      </script>{% endif %}
+      <script src="{% static 'diary/photo-post.js' %}?v=2"></script>{% endif %}
     {% endif %}
   </div>
 {% endblock %}

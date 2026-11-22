@@ -6,6 +6,7 @@ class UserProfile(models.Model):
     user = models.OneToOneField("auth.User", on_delete=models.CASCADE, related_name="travel_profile")
     avatar = models.ImageField(upload_to="profile_avatars/", blank=True)
     cover_image = models.ImageField(upload_to="profile_covers/", blank=True)
+    bio = models.CharField(max_length=500, blank=True, default="")
 
 
 class Country(models.Model):
@@ -130,6 +131,8 @@ class TravelPhoto(models.Model):
     place = models.ForeignKey(Place, on_delete=models.SET_NULL, null=True, blank=True, related_name="photos")
     image = models.ImageField(upload_to="travel_photos/", blank=True)
     caption = models.CharField(max_length=255, blank=True)
+    credit_text = models.CharField(max_length=255, blank=True)
+    credit_url = models.URLField(max_length=500, blank=True)
     taken_on = models.DateField(null=True, blank=True)
     tags = models.ManyToManyField("Tag", blank=True, related_name="photos")
     likes = models.ManyToManyField("auth.User", blank=True, related_name="liked_travel_photos")
@@ -137,6 +140,10 @@ class TravelPhoto(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+
+    @property
+    def credit_display(self):
+        return self.credit_text.split("; ", 1)[0]
 
 
 class PhotoComment(models.Model):
@@ -154,6 +161,13 @@ class PhotoComment(models.Model):
 
 class JournalEntry(models.Model):
     travel = models.ForeignKey(Travel, on_delete=models.CASCADE, related_name="journal_entries")
+    photo = models.OneToOneField(
+        TravelPhoto,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="journal_entry",
+    )
     title = models.CharField(max_length=200)
     body = models.TextField()
     entry_date = models.DateField()

@@ -1,0 +1,27 @@
+{% extends "diary/base.html" %}
+{% load static %}
+{% block title %}{{ photo.caption|default:"Travel post" }} — Roam{% endblock %}
+{% block breadcrumb %}Travel post{% endblock %}
+{% block content %}
+  <style>
+    .photo-detail-page{max-width:1000px;margin:0 auto}
+    .photo-detail-back{display:inline-flex;margin:0 0 16px;color:var(--purple);font-size:12px;font-weight:700;text-decoration:none}
+    .photo-detail-card{overflow:hidden;border:1px solid var(--border);border-radius:16px;background:var(--glass);box-shadow:0 16px 42px #211b2d12}
+    .photo-detail-card .profile-post-view{min-height:min(600px,calc(100dvh - 180px));max-height:none}
+    .photo-detail-card .profile-post-media{min-height:420px}
+    .photo-detail-card .profile-post-media img{max-height:75vh}
+    .photo-detail-card .profile-post-details{min-height:420px}
+    @media(max-width:700px){
+      .photo-detail-card .profile-post-view{min-height:0;max-height:none}
+      .photo-detail-card .profile-post-media{min-height:40vh}
+      .photo-detail-card .profile-post-details{min-height:360px}
+    }
+  </style>
+  <section class="photo-detail-page" data-photo-post-detail>
+    <a class="photo-detail-back" href="{% url 'map' %}">← Back to map</a>
+    <div class="photo-detail-card">
+      {% include "diary/profile_post_content.html" with photo=photo %}
+    </div>
+  </section>
+  <script src="{% static 'diary/photo-post.js' %}?v=2"></script>
+{% endblock %}

@@ -32,6 +32,7 @@
         <label for="country-search">Choose country</label>
         <input id="country-search" class="country-search" type="search" placeholder="Search countries or cities..." autocomplete="off" aria-controls="country-options">
         <input id="country-value" type="hidden" name="country" value="">
+        <input id="country-name" type="hidden" name="country_name" value="">
         <div id="country-recommendations" class="country-recommendations" aria-live="polite"></div>
         <div id="country-options" class="country-options" role="listbox" aria-label="Countries">
           {% for country in countries %}
@@ -51,6 +52,7 @@
     (() => {
       const search = document.querySelector("#country-search");
       const value = document.querySelector("#country-value");
+      const countryNameValue = document.querySelector("#country-name");
       const location = document.querySelector("#country-location");
       const recommendations = document.querySelector("#country-recommendations");
       const options = [...document.querySelectorAll(".country-option")];
@@ -71,21 +73,38 @@
       ];
 
       function selectPlace(name, country, code, place) {
+        clearTimeout(photonTimer);
+        photonRequest?.abort();
         value.value = `code:${code}`;
+        countryNameValue.value = country;
         search.value = name;
         location.textContent = `${place ? `${place} — ` : ""}${country}`;
         options.forEach((item) => item.classList.toggle("is-selected", item.dataset.code === code));
         recommendations.replaceChildren();
       }
 
-      function renderPhotonRecommendations(features) {
-        features.forEach((feature) => {
+      function renderPhotonRecommendations(features, query) {
+        const terms = query.split(/\s+/).filter(Boolean);
+        features.filter((feature) => {
+          const country = (feature.country || "").toLowerCase();
+          const location = [feature.city, feature.state].filter(Boolean).join(" ").toLowerCase();
+          return country.includes(query) || terms.every((term) => location.includes(term));
+        }).forEach((feature) => {
           const code = countryCodeMap[feature.country_code] || feature.country_code;
           const place = [feature.city, feature.state].filter(Boolean).join(", ");
           const button = document.createElement("button");
           button.type = "button";
           button.className = "country-recommendation is-photon";
-          button.innerHTML = `<span><strong>${feature.name}</strong><small>${[place, feature.country].filter(Boolean).join(", ")}</small></span><span class="recommendation-label">Photon</span>`;
+          const text = document.createElement("span");
+          const title = document.createElement("strong");
+          const detail = document.createElement("small");
+          const source = document.createElement("span");
+          title.textContent = feature.name;
+          detail.textContent = [place, feature.country].filter(Boolean).join(", ");
+          source.className = "recommendation-label";
+          source.textContent = "Photon";
+          text.append(title, detail);
+          button.append(text, source);
           button.addEventListener("click", () => selectPlace(feature.name, feature.country || "Unknown country", code, place));
           recommendations.append(button);
         });
@@ -93,15 +112,17 @@
 
       let photonTimer;
       let photonRequest;
-      async function loadPhotonRecommendations(query) {
+      let photonRequestVersion = 0;
+      async function loadPhotonRecommendations(query, requestVersion) {
+        if (requestVersion !== photonRequestVersion) return;
         if (photonRequest) photonRequest.abort();
         photonRequest = new AbortController();
         try {
           const response = await fetch(`{% url 'photon_search' %}?q=${encodeURIComponent(query)}`, {signal: photonRequest.signal});
           if (!response.ok) return;
           const data = await response.json();
-          if (search.value.trim().toLowerCase() !== query) return;
-          renderPhotonRecommendations(data.features || []);
+          if (requestVersion !== photonRequestVersion || search.value.trim().toLowerCase() !== query) return;
+          renderPhotonRecommendations(data.features || [], query);
         } catch (error) {
           if (error.name !== "AbortError") console.warn("Photon recommendations unavailable", error);
         }
@@ -109,13 +130,15 @@
 
       function filterCountries() {
         const query = search.value.trim().toLowerCase();
+        const requestVersion = ++photonRequestVersion;
         options.forEach((option) => {
           option.hidden = query && !option.dataset.name.includes(query) && !option.dataset.code.toLowerCase().includes(query);
         });
         recommendations.replaceChildren();
-        if (!query) return;
         clearTimeout(photonTimer);
-        if (query.length >= 2) photonTimer = setTimeout(() => loadPhotonRecommendations(query), 300);
+        if (photonRequest) photonRequest.abort();
+        if (!query) return;
+        if (query.length >= 2) photonTimer = setTimeout(() => loadPhotonRecommendations(query, requestVersion), 300);
         countryRecommendations
           .filter(([country, location]) => `${country} ${location}`.toLowerCase().includes(query))
           .slice(0, 4)
@@ -125,14 +148,7 @@
             button.className = "country-recommendation";
             button.innerHTML = `<span><strong>${country}</strong><small>Recommended location: ${place}</small></span><span class="recommendation-label">${code}</span>`;
             button.addEventListener("click", () => {
-              value.value = `code:${code}`;
-              search.value = country;
-              location.textContent = `${country} — ${place}`;
-              options.forEach((item) => item.classList.remove("is-selected"));
-              const existing = options.find((item) => item.dataset.code === code);
-              if (existing) existing.classList.add("is-selected");
-              filterCountries();
-              recommendations.replaceChildren();
+              selectPlace(country, country, code, place);
             });
             recommendations.append(button);
           });
@@ -143,9 +159,13 @@
           options.forEach((item) => item.classList.remove("is-selected"));
           option.classList.add("is-selected");
           value.value = option.dataset.id;
+          countryNameValue.value = option.dataset.label;
           search.value = option.dataset.label;
           location.textContent = `${option.dataset.label} (${option.dataset.code})`;
-          filterCountries();
+          photonRequestVersion += 1;
+          clearTimeout(photonTimer);
+          photonRequest?.abort();
+          recommendations.replaceChildren();
         });
       });
 
@@ -188,11 +208,15 @@
             ID:"IDN", PH:"PHL", KR:"KOR", CN:"CHN", SG:"SGP", JP:"JPN", AU:"AUS", NZ:"NZL"
           };
           value.value = `code:${alpha3[countryCode] || countryCode}`;
+          countryNameValue.value = countryName;
           search.value = placeName;
           location.textContent = `${placeName} — ${countryName}`;
+          photonRequestVersion += 1;
+          clearTimeout(photonTimer);
+          photonRequest?.abort();
           options.forEach((item) => item.classList.toggle("is-selected", item.dataset.code === alpha3[countryCode]));
           recommendations.replaceChildren();
-          filterCountries();
+          options.forEach((item) => { item.hidden = false; });
         });
       };
     })();

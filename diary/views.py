@@ -11,7 +11,7 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Q
-from django.http import HttpResponseBadRequest, HttpResponseForbidden, HttpResponseNotAllowed, JsonResponse
+from django.http import Http404, HttpResponseBadRequest, HttpResponseForbidden, HttpResponseNotAllowed, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -82,6 +82,12 @@ class AccommodationForm(OwnedTravelForm):
             "check_out": forms.DateInput(attrs={"type": "date"}),
         }
 
+    def __init__(self, *args, user, **kwargs):
+        super().__init__(*args, user=user, **kwargs)
+        self.fields["address"].widget.attrs.update({
+            "data-location-autocomplete": "address",
+        })
+
 
 class ExpenseForm(OwnedTravelForm):
     class Meta:
@@ -104,9 +110,177 @@ class PlaceForm(forms.ModelForm):
 
     def __init__(self, *args, user, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["name"].widget.attrs.update({
+            "data-location-autocomplete": "place",
+            "data-location-address-target": "#id_address",
+            "data-location-latitude-target": "#id_latitude",
+            "data-location-longitude-target": "#id_longitude",
+        })
+        self.fields["address"].widget.attrs.update({
+            "data-location-autocomplete": "address",
+            "data-location-latitude-target": "#id_latitude",
+            "data-location-longitude-target": "#id_longitude",
+        })
         self.fields["region"].queryset = Region.objects.filter(
             Q(owner__isnull=True) | Q(owner=user)
         ).distinct()
+
+
+class InlineJourneyForm(forms.Form):
+    title = forms.CharField(max_length=200, label="Journey name")
+    start_date = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}))
+    end_date = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}))
+    status = forms.ChoiceField(choices=Travel._meta.get_field("status").choices)
+    country_name = forms.CharField(max_length=100, required=False, label="Country")
+    country_code = forms.CharField(max_length=3, min_length=2, required=False, label="Country code")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["country_name"].widget.attrs.update({
+            "data-location-autocomplete": "country",
+            "data-location-code-target": "#id_new_journey-country_code",
+        })
+
+    def clean(self):
+        cleaned_data = super().clean()
+        start_date = cleaned_data.get("start_date")
+        end_date = cleaned_data.get("end_date")
+        if start_date and end_date and end_date < start_date:
+            self.add_error("end_date", "End date must be on or after the start date.")
+        country_name = cleaned_data.get("country_name", "").strip()
+        country_code = cleaned_data.get("country_code", "").strip()
+        if bool(country_name) != bool(country_code):
+            self.add_error("country_name", "Choose a country recommendation to fill its code.")
+        if country_code:
+            cleaned_data["country_code"] = country_code.upper()
+        return cleaned_data
+
+
+class PrivateTripDetailsForm(forms.Form):
+    details = forms.CharField(
+        max_length=5000,
+        required=False,
+        label="Private trip details",
+        widget=forms.Textarea(attrs={
+            "rows": 4,
+            "placeholder": "Add notes, plans, or other trip details for your travel data.",
+        }),
+    )
+
+
+class InlineAccommodationForm(forms.Form):
+    name = forms.CharField(max_length=180, required=False)
+    address = forms.CharField(max_length=255, required=False)
+    check_in = forms.DateField(required=False, widget=forms.DateInput(attrs={"type": "date"}))
+    check_out = forms.DateField(required=False, widget=forms.DateInput(attrs={"type": "date"}))
+    booking_reference = forms.CharField(max_length=100, required=False)
+    notes = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 2}))
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if any(value not in (None, "") for value in cleaned_data.values()):
+            for field in ("name", "check_in", "check_out"):
+                if not cleaned_data.get(field):
+                    self.add_error(field, "This field is required when adding an accommodation.")
+            check_in = cleaned_data.get("check_in")
+            check_out = cleaned_data.get("check_out")
+            if check_in and check_out and check_out < check_in:
+                self.add_error("check_out", "Check-out must be on or after check-in.")
+        return cleaned_data
+
+    def has_details(self):
+        return any(value not in (None, "") for value in self.cleaned_data.values())
+
+
+class InlineExpenseForm(forms.Form):
+    category = forms.ChoiceField(
+        choices=[("", "Choose a category")] + list(Expense._meta.get_field("category").choices),
+        required=False,
+    )
+    description = forms.CharField(max_length=200, required=False)
+    amount = forms.DecimalField(max_digits=10, decimal_places=2, min_value=0, required=False)
+    currency = forms.CharField(max_length=3, required=False, initial="USD")
+    spent_on = forms.DateField(required=False, widget=forms.DateInput(attrs={"type": "date"}))
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if any(value not in (None, "") for value in cleaned_data.values()):
+            for field in ("description", "amount", "spent_on"):
+                if cleaned_data.get(field) in (None, ""):
+                    self.add_error(field, "This field is required when adding an expense.")
+        return cleaned_data
+
+    def has_details(self):
+        return any(value not in (None, "") for value in self.cleaned_data.values())
+
+
+class InlineJournalEntryForm(forms.Form):
+    title = forms.CharField(max_length=200, required=False)
+    body = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 3}))
+    entry_date = forms.DateField(required=False, widget=forms.DateInput(attrs={"type": "date"}))
+    mood = forms.CharField(max_length=40, required=False)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if any(value not in (None, "") for value in cleaned_data.values()):
+            for field in ("title", "body", "entry_date"):
+                if not cleaned_data.get(field):
+                    self.add_error(field, "This field is required when adding a journal entry.")
+        return cleaned_data
+
+    def has_details(self):
+        return any(value not in (None, "") for value in self.cleaned_data.values())
+
+
+class JourneyTagsForm(forms.Form):
+    tags = forms.CharField(
+        max_length=600,
+        required=False,
+        help_text="Separate tags with commas. Tags appear publicly with this post.",
+    )
+
+    def clean_tags(self):
+        tags = []
+        seen = set()
+        for value in self.cleaned_data["tags"].split(","):
+            name = value.strip()
+            normalized = name.casefold()
+            if not name or normalized in seen:
+                continue
+            if len(name) > 60:
+                raise ValidationError("Each tag must be 60 characters or fewer.")
+            tags.append(name)
+            seen.add(normalized)
+        return tags
+
+    def has_details(self):
+        return bool(self.cleaned_data.get("tags"))
+
+
+class InlinePlaceForm(forms.Form):
+    name = forms.CharField(
+        max_length=180,
+        label="Search for a place",
+        widget=forms.TextInput(attrs={"autocomplete": "off"}),
+    )
+    address = forms.CharField(max_length=255, required=False, label="Address")
+    latitude = forms.DecimalField(
+        max_digits=9, decimal_places=6, min_value=-90, max_value=90,
+        widget=forms.HiddenInput(),
+    )
+    longitude = forms.DecimalField(
+        max_digits=9, decimal_places=6, min_value=-180, max_value=180,
+        widget=forms.HiddenInput(),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["name"].widget.attrs.update({
+            "data-location-autocomplete": "place",
+            "data-location-address-target": "#id_new_place-address",
+            "data-location-latitude-target": "#id_new_place-latitude",
+            "data-location-longitude-target": "#id_new_place-longitude",
+        })
 
 
 class TravelPhotoForm(OwnedTravelForm):
@@ -131,7 +305,10 @@ class CountryAssignmentForm(forms.Form):
         widget=forms.CheckboxSelectMultiple,
     )
     new_country_name = forms.CharField(max_length=100, required=False, label="Or add a country")
-    new_country_code = forms.CharField(min_length=3, max_length=3, required=False, label="Country code")
+    new_country_code = forms.CharField(
+        min_length=2, max_length=3, required=False,
+        label="Country code (ISO, 2-3 letters)",
+    )
 
     def __init__(self, *args, user, **kwargs):
         super().__init__(*args, **kwargs)
@@ -139,6 +316,11 @@ class CountryAssignmentForm(forms.Form):
         self.fields["countries"].queryset = Country.objects.filter(
             Q(owner__isnull=True) | Q(owner=user)
         ).distinct()
+        self.fields["new_country_name"].widget.attrs.update({
+            "data-location-autocomplete": "country",
+            "data-location-code-target": "#id_new_country_code",
+        })
+        self.fields["new_country_code"].widget.attrs.update({"inputmode": "text", "autocomplete": "off"})
 
 
 class RegionAssignmentForm(forms.Form):
@@ -157,6 +339,10 @@ class RegionAssignmentForm(forms.Form):
         self.fields["country"].queryset = Country.objects.filter(
             Q(owner__isnull=True) | Q(owner=user)
         ).distinct()
+        self.fields["new_region_name"].widget.attrs.update({
+            "data-location-autocomplete": "region",
+            "data-location-country-target": "#id_country",
+        })
 
     def save(self):
         place = self.cleaned_data["place"]
@@ -207,6 +393,14 @@ class PrivateCountryForm(forms.ModelForm):
         model = Country
         fields = ["name", "code"]
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["name"].widget.attrs.update({
+            "data-location-autocomplete": "country",
+            "data-location-code-target": "#id_code",
+        })
+        self.fields["code"].widget.attrs.update({"inputmode": "text", "autocomplete": "off"})
+
     def clean_code(self):
         code = self.cleaned_data["code"].upper()
         if Country.objects.filter(owner=self.instance.owner, code=code).exclude(pk=self.instance.pk).exists():
@@ -221,6 +415,10 @@ class PrivateRegionForm(forms.ModelForm):
 
     def __init__(self, *args, user, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["name"].widget.attrs.update({
+            "data-location-autocomplete": "region",
+            "data-location-country-target": "#id_country",
+        })
         self.fields["country"].queryset = Country.objects.filter(
             Q(owner__isnull=True) | Q(owner=user)
         ).distinct()
@@ -260,7 +458,7 @@ def dashboard(request):
         if request.user.is_authenticated else Travel.objects.none()
     )
     photo_query = TravelPhoto.objects.select_related(
-        "travel", "place", "author", "author__travel_profile",
+        "travel", "place", "author", "author__travel_profile", "journal_entry",
     ).prefetch_related(
         "tags", "likes", "comments__author", "comments__likes",
         "comments__replies__author", "comments__replies__likes",
@@ -341,32 +539,168 @@ def upload_photo(request):
 
 def add_memory(request):
     context = _social_context(request, "add_memory")
+    new_journey_form = InlineJourneyForm(prefix="new_journey")
+    private_trip_details_form = PrivateTripDetailsForm()
+    accommodation_form = InlineAccommodationForm(prefix="accommodation")
+    expense_form = InlineExpenseForm(prefix="expense")
+    journal_entry_form = InlineJournalEntryForm(prefix="journal")
+    journey_tags_form = JourneyTagsForm(prefix="journey_tags")
+    new_place_form = InlinePlaceForm(prefix="new_place")
     context.update({
         "photo_travels": Travel.objects.filter(owner=request.user) if request.user.is_authenticated else Travel.objects.none(),
         "photo_places": Place.objects.filter(owner=request.user) if request.user.is_authenticated else Place.objects.none(),
         "photo_tags": Tag.objects.filter(Q(owner=request.user) | Q(travels__owner=request.user)).distinct() if request.user.is_authenticated else Tag.objects.none(),
+        "new_journey_form": new_journey_form,
+        "private_trip_details_form": private_trip_details_form,
+        "accommodation_form": accommodation_form,
+        "expense_form": expense_form,
+        "journal_entry_form": journal_entry_form,
+        "journey_tags_form": journey_tags_form,
+        "new_place_form": new_place_form,
     })
     if request.method == "POST":
         if not request.user.is_authenticated:
             return redirect(f"/login/?next={request.path}")
-        travel = get_object_or_404(Travel, pk=request.POST.get("travel"), owner=request.user)
-        place = get_object_or_404(Place, pk=request.POST.get("place"), owner=request.user) if request.POST.get("place") else None
+        errors = []
+        private_trip_details_form = PrivateTripDetailsForm(request.POST)
+        accommodation_form = InlineAccommodationForm(request.POST, prefix="accommodation")
+        expense_form = InlineExpenseForm(request.POST, prefix="expense")
+        journal_entry_form = InlineJournalEntryForm(request.POST, prefix="journal")
+        journey_tags_form = JourneyTagsForm(request.POST, prefix="journey_tags")
+        if not private_trip_details_form.is_valid():
+            errors.append("Check the private trip details.")
+        if not accommodation_form.is_valid():
+            errors.append("Check the accommodation details.")
+        if not expense_form.is_valid():
+            errors.append("Check the expense details.")
+        if not journal_entry_form.is_valid():
+            errors.append("Check the journal entry details.")
+        if not journey_tags_form.is_valid():
+            errors.append("Check the journey tags.")
+        travel_value = request.POST.get("travel", "")
+        place_value = request.POST.get("place", "")
+        if travel_value == "__new__":
+            new_journey_form = InlineJourneyForm(request.POST, prefix="new_journey")
+            if not new_journey_form.is_valid():
+                errors.append("Check the new journey details.")
+        elif travel_value:
+            travel = get_object_or_404(Travel, pk=travel_value, owner=request.user)
+        else:
+            errors.append("Choose a journey or create a new one.")
+
+        if place_value == "__new__":
+            new_place_form = InlinePlaceForm(request.POST, prefix="new_place")
+            if not new_place_form.is_valid():
+                errors.append("Choose a place recommendation so its map coordinates are included.")
+        elif place_value:
+            place = get_object_or_404(Place, pk=place_value, owner=request.user)
+        else:
+            place = None
+
+        image = request.FILES.get("image")
+        if image is None:
+            errors.append("Choose a photo to share.")
         tag_ids = request.POST.getlist("tags")
         allowed_tags = Tag.objects.filter(
             Q(owner=request.user) | Q(travels__owner=request.user)
         ).distinct()
         tags = list(allowed_tags.filter(pk__in=tag_ids))
         if len(tags) != len(set(tag_ids)):
-            return HttpResponseBadRequest("One or more selected tags are not available to this account.")
-        photo = TravelPhoto.objects.create(
-            travel=travel,
-            author=request.user,
-            place=place,
-            image=request.FILES["image"],
-            caption=request.POST.get("caption", ""),
-            taken_on=request.POST.get("taken_on") or None,
-        )
-        photo.tags.set(tags)
+            errors.append("One or more selected tags are not available to this account.")
+        if errors:
+            context.update({
+                "new_journey_form": new_journey_form,
+                "private_trip_details_form": private_trip_details_form,
+                "accommodation_form": accommodation_form,
+                "expense_form": expense_form,
+                "journal_entry_form": journal_entry_form,
+                "journey_tags_form": journey_tags_form,
+                "new_place_form": new_place_form,
+                "memory_errors": errors,
+            })
+            return render(request, "diary/add_memory.html", context, status=400)
+
+        with transaction.atomic():
+            if travel_value == "__new__":
+                journey_data = new_journey_form.cleaned_data
+                travel = Travel.objects.create(
+                    owner=request.user,
+                    title=journey_data["title"],
+                    description=private_trip_details_form.cleaned_data["details"].strip(),
+                    start_date=journey_data["start_date"],
+                    end_date=journey_data["end_date"],
+                    status=journey_data["status"],
+                )
+                country_name = journey_data.get("country_name", "").strip()
+                country_code = journey_data.get("country_code", "").strip().upper()
+                if country_name and country_code:
+                    country = Country.objects.filter(
+                        owner__isnull=True, name__iexact=country_name,
+                    ).first() or Country.objects.filter(
+                        owner=request.user, name__iexact=country_name,
+                    ).first()
+                    if country is None:
+                        country = Country.objects.filter(
+                            Q(owner__isnull=True) | Q(owner=request.user),
+                            code=country_code,
+                        ).first()
+                    if country is None:
+                        country = Country.objects.create(
+                            owner=request.user, name=country_name, code=country_code,
+                        )
+                    travel.countries.add(country)
+            else:
+                details = private_trip_details_form.cleaned_data["details"].strip()
+                if details:
+                    travel.description = details
+                    travel.save(update_fields=["description"])
+            if place_value == "__new__":
+                place_data = new_place_form.cleaned_data
+                place = Place.objects.create(
+                    owner=request.user,
+                    name=place_data["name"],
+                    address=place_data["address"],
+                    latitude=place_data["latitude"],
+                    longitude=place_data["longitude"],
+                )
+            photo = TravelPhoto.objects.create(
+                travel=travel,
+                author=request.user,
+                place=place,
+                image=image,
+                caption=request.POST.get("caption", ""),
+                taken_on=request.POST.get("taken_on") or None,
+            )
+            photo.tags.set(tags)
+            if accommodation_form.has_details():
+                Accommodation.objects.create(
+                    travel=travel,
+                    **accommodation_form.cleaned_data,
+                )
+            if expense_form.has_details():
+                expense_data = expense_form.cleaned_data
+                Expense.objects.create(
+                    travel=travel,
+                    category=expense_data["category"] or "other",
+                    description=expense_data["description"],
+                    amount=expense_data["amount"],
+                    currency=(expense_data["currency"] or "USD").upper(),
+                    spent_on=expense_data["spent_on"],
+                )
+            if journal_entry_form.has_details():
+                JournalEntry.objects.create(
+                    travel=travel,
+                    photo=photo,
+                    **journal_entry_form.cleaned_data,
+                )
+            for name in journey_tags_form.cleaned_data["tags"]:
+                tag = Tag.objects.filter(
+                    owner=request.user, name__iexact=name,
+                ).first()
+                if tag is None:
+                    tag = Tag.objects.create(owner=request.user, name=name)
+                tag.travels.add(travel)
+                photo.tags.add(tag)
         return redirect("dashboard")
     return render(request, "diary/add_memory.html", context)
 
@@ -380,40 +714,55 @@ def add_journey(request):
     ).distinct()
     context["google_maps_api_key"] = os.environ.get("GOOGLE_MAPS_API_KEY", "")
     if request.method == "POST":
-        travel = Travel.objects.create(
-            owner=request.user,
-            title=request.POST["title"],
-            description=request.POST.get("description", ""),
-            start_date=request.POST["start_date"],
-            end_date=request.POST["end_date"],
-            status=request.POST.get("status", "planned"),
-        )
         country_id = request.POST.get("country")
-        if country_id:
-            if country_id.startswith("code:"):
-                code = country_id.removeprefix("code:")
-                country = Country.objects.filter(
-                    Q(owner__isnull=True) | Q(owner=request.user), code=code,
-                ).first()
-                if country is None:
-                    country_data = {
-                        "JPN": "Japan", "FRA": "France", "ITA": "Italy", "PRT": "Portugal",
-                        "ESP": "Spain", "GBR": "United Kingdom", "GRC": "Greece", "ISL": "Iceland",
-                        "IRL": "Ireland", "NLD": "Netherlands", "DEU": "Germany", "AUT": "Austria",
-                        "CZE": "Czechia", "HRV": "Croatia", "CHE": "Switzerland", "NOR": "Norway",
-                        "SWE": "Sweden", "TUR": "Turkey", "MAR": "Morocco", "EGY": "Egypt",
-                        "ZAF": "South Africa", "KEN": "Kenya", "TZA": "Tanzania",
-                        "ARE": "United Arab Emirates", "JOR": "Jordan", "IND": "India", "NPL": "Nepal",
-                        "LKA": "Sri Lanka", "THA": "Thailand", "VNM": "Vietnam", "KHM": "Cambodia",
-                        "MYS": "Malaysia", "IDN": "Indonesia", "PHL": "Philippines", "KOR": "South Korea",
-                        "CHN": "China", "SGP": "Singapore", "AUS": "Australia", "NZL": "New Zealand",
-                        "USA": "United States", "CAN": "Canada", "MEX": "Mexico", "CRI": "Costa Rica",
-                        "BRA": "Brazil", "PER": "Peru", "ARG": "Argentina", "CHL": "Chile",
-                    }
-                    name = country_data.get(code, code)
-                    country = Country.objects.create(name=name, code=code, owner=request.user)
-                country_id = country.id
-            travel.countries.add(country_id)
+        country_name = request.POST.get("country_name", "").strip()
+        with transaction.atomic():
+            country = None
+            if country_id:
+                available_countries = Country.objects.filter(
+                    Q(owner__isnull=True) | Q(owner=request.user)
+                )
+                if country_id.startswith("code:"):
+                    code = country_id.removeprefix("code:").upper()
+                    country = available_countries.filter(code=code).first()
+                    if country is None and country_name:
+                        country = available_countries.filter(name__iexact=country_name).first()
+                    if country is None:
+                        country_data = {
+                            "JPN": "Japan", "FRA": "France", "ITA": "Italy", "PRT": "Portugal",
+                            "ESP": "Spain", "GBR": "United Kingdom", "GRC": "Greece", "ISL": "Iceland",
+                            "IRL": "Ireland", "NLD": "Netherlands", "DEU": "Germany", "AUT": "Austria",
+                            "CZE": "Czechia", "HRV": "Croatia", "CHE": "Switzerland", "NOR": "Norway",
+                            "SWE": "Sweden", "TUR": "Turkey", "MAR": "Morocco", "EGY": "Egypt",
+                            "ZAF": "South Africa", "KEN": "Kenya", "TZA": "Tanzania",
+                            "ARE": "United Arab Emirates", "JOR": "Jordan", "IND": "India", "NPL": "Nepal",
+                            "LKA": "Sri Lanka", "THA": "Thailand", "VNM": "Vietnam", "KHM": "Cambodia",
+                            "MYS": "Malaysia", "IDN": "Indonesia", "PHL": "Philippines", "KOR": "South Korea",
+                            "CHN": "China", "SGP": "Singapore", "AUS": "Australia", "NZL": "New Zealand",
+                            "USA": "United States", "CAN": "Canada", "MEX": "Mexico", "CRI": "Costa Rica",
+                            "BRA": "Brazil", "PER": "Peru", "ARG": "Argentina", "CHL": "Chile",
+                        }
+                        country_name = country_name or country_data.get(code, code)
+                        country, created = Country.objects.get_or_create(
+                            owner=request.user,
+                            code=code,
+                            defaults={"name": country_name},
+                        )
+                        if not created and country.name.casefold() != country_name.casefold():
+                            return HttpResponseBadRequest("That country code is already used by another country.")
+                else:
+                    country = get_object_or_404(available_countries, pk=country_id)
+
+            travel = Travel.objects.create(
+                owner=request.user,
+                title=request.POST["title"],
+                description=request.POST.get("description", ""),
+                start_date=request.POST["start_date"],
+                end_date=request.POST["end_date"],
+                status=request.POST.get("status", "planned"),
+            )
+            if country:
+                travel.countries.add(country)
         return redirect("journeys")
     return render(request, "diary/add_journey.html", context)
 
@@ -557,21 +906,29 @@ def profile_data_view(request, category, record_id=None, action=None, item=False
                     if not name:
                         form.add_error("new_country_name", "Enter a country name.")
                     if not code:
-                        form.add_error("new_country_code", "Enter a three-letter country code.")
+                        form.add_error("new_country_code", "Enter a two- or three-letter country code.")
                 else:
                     country = Country.objects.filter(
-                        code=code, owner__isnull=True, name=name,
+                        owner__isnull=True, name__iexact=name,
+                    ).first() or Country.objects.filter(
+                        owner=request.user, name__iexact=name,
                     ).first()
                     if country is None:
-                        country, created = Country.objects.get_or_create(
-                            code=code, owner=request.user, defaults={"name": name},
-                        )
-                    else:
-                        created = True
-                    if not created and country.name != name:
+                        country = Country.objects.filter(
+                            Q(owner__isnull=True) | Q(owner=request.user),
+                            code=code,
+                        ).first()
+                    if country and country.name.casefold() != name.casefold():
                         form.add_error("new_country_code", "That code is already used by another country.")
                     else:
-                        countries.append(country)
+                        if country is None:
+                            country, created = Country.objects.get_or_create(
+                                code=code, owner=request.user, defaults={"name": name},
+                            )
+                            if not created and country.name.casefold() != name.casefold():
+                                form.add_error("new_country_code", "That code is already used by another country.")
+                        if not form.errors:
+                            countries.append(country)
             if not form.errors:
                 travel.countries.set(countries)
                 for previous_country in previous_countries:
@@ -738,14 +1095,18 @@ def profile_view(request, user_id=None):
         ).exists()
     profile = UserProfile.objects.filter(user=profile_user).first() if profile_user else None
     context["profile_user"] = profile_user
+    context["profile_bio"] = profile.bio if profile else ""
     context["guest_profile"] = not request.user.is_authenticated
     context["is_profile_owner"] = is_owner
     context["is_profile_friend"] = is_friend
     context["profile_avatar"] = profile.avatar.url if profile and profile.avatar else ""
     context["profile_cover"] = profile.cover_image.url if profile and profile.cover_image else ""
     profile_photo_query = TravelPhoto.objects.select_related(
-        "travel", "place", "author", "author__travel_profile",
-    ).prefetch_related("likes", "comments__author", "comments__replies__author")
+        "travel", "place", "author", "author__travel_profile", "journal_entry",
+    ).prefetch_related(
+        "tags", "likes", "comments__author", "comments__likes",
+        "comments__replies__author", "comments__replies__likes",
+    )
     context["posted_photos"] = (
         profile_photo_query.filter(author=profile_user)
         if is_owner or is_friend else TravelPhoto.objects.none()
@@ -792,18 +1153,47 @@ def profile_view(request, user_id=None):
         owned_places = Place.objects.filter(
             Q(owner=profile_user) | Q(photos__author=profile_user) | Q(activities__day__travel__owner=profile_user)
         ).distinct()
-        context["profile_crud"] = [
+        profile_crud = [
             {"slug": "journeys", "label": "Journeys", "items": owned_travels, "count": owned_travels.count()},
             {"slug": "countries", "label": "Countries", "items": Country.objects.filter(travels__owner=profile_user).distinct(), "count": Country.objects.filter(travels__owner=profile_user).distinct().count()},
+            {"slug": "places", "label": "Saved places", "items": owned_places, "count": owned_places.count()},
             {"slug": "regions", "label": "Regions", "items": Region.objects.filter(places__in=owned_places).distinct(), "count": Region.objects.filter(places__in=owned_places).distinct().count()},
             {"slug": "itinerary-days", "label": "Itinerary days", "items": ItineraryDay.objects.filter(travel_id__in=travel_ids), "count": ItineraryDay.objects.filter(travel_id__in=travel_ids).count()},
-            {"slug": "places", "label": "Saved places", "items": owned_places, "count": owned_places.count()},
             {"slug": "activities", "label": "Activities", "items": Activity.objects.filter(day__travel_id__in=travel_ids), "count": Activity.objects.filter(day__travel_id__in=travel_ids).count()},
             {"slug": "accommodations", "label": "Accommodations", "items": Accommodation.objects.filter(travel_id__in=travel_ids), "count": Accommodation.objects.filter(travel_id__in=travel_ids).count()},
             {"slug": "expenses", "label": "Expenses", "items": Expense.objects.filter(travel_id__in=travel_ids), "count": Expense.objects.filter(travel_id__in=travel_ids).count()},
             {"slug": "photos", "label": "Photos", "items": TravelPhoto.objects.filter(author=profile_user), "count": TravelPhoto.objects.filter(author=profile_user).count()},
             {"slug": "journal-entries", "label": "Journal entries", "items": JournalEntry.objects.filter(travel_id__in=travel_ids), "count": JournalEntry.objects.filter(travel_id__in=travel_ids).count()},
             {"slug": "tags", "label": "Tags", "items": Tag.objects.filter(Q(owner=profile_user) | Q(travels__owner=profile_user)).distinct(), "count": Tag.objects.filter(Q(owner=profile_user) | Q(travels__owner=profile_user)).distinct().count()},
+        ]
+        profile_crud_by_slug = {record["slug"]: record for record in profile_crud}
+        context["profile_crud_groups"] = [
+            {
+                "number": "01",
+                "title": "Plan your journey",
+                "description": "Create a journey first, then connect the countries you plan to visit.",
+                "records": [profile_crud_by_slug[slug] for slug in ("journeys", "countries")],
+            },
+            {
+                "number": "02",
+                "title": "Connect places and days",
+                "description": "Save places, link regions, add itinerary days, then plan activities.",
+                "records": [
+                    profile_crud_by_slug[slug]
+                    for slug in ("places", "regions", "itinerary-days", "activities")
+                ],
+            },
+            {
+                "number": "03",
+                "title": "Add the trip details",
+                "description": "Keep bookings, expenses, photos, journal entries, and tags with your journey.",
+                "records": [
+                    profile_crud_by_slug[slug]
+                    for slug in (
+                        "accommodations", "expenses", "photos", "journal-entries", "tags",
+                    )
+                ],
+            },
         ]
     return render(request, "diary/profile.html", context)
 
@@ -814,6 +1204,9 @@ def settings_view(request):
     if request.method == "POST":
         avatar = request.FILES.get("avatar")
         cover_image = request.FILES.get("cover_image")
+        bio = request.POST.get("bio", "").strip()
+        if "bio" in request.POST and len(bio) > 500:
+            return HttpResponseBadRequest("Bio must be 500 characters or fewer.")
         for upload, label in ((avatar, "Profile photos"), (cover_image, "Profile backgrounds")):
             if upload and upload.size > 5 * 1024 * 1024:
                 return HttpResponseBadRequest(f"{label} must be 5 MB or smaller.")
@@ -826,16 +1219,20 @@ def settings_view(request):
         request.user.last_name = request.POST.get("last_name", "").strip()
         request.user.email = request.POST.get("email", "").strip()
         request.user.save(update_fields=["first_name", "last_name", "email"])
-        if avatar or cover_image:
+        if "bio" in request.POST or avatar or cover_image:
             profile, _ = UserProfile.objects.get_or_create(user=request.user)
             update_fields = []
+            if "bio" in request.POST:
+                profile.bio = bio
+                update_fields.append("bio")
             if avatar:
                 profile.avatar = avatar
                 update_fields.append("avatar")
             if cover_image:
                 profile.cover_image = cover_image
                 update_fields.append("cover_image")
-            profile.save(update_fields=update_fields)
+            if update_fields:
+                profile.save(update_fields=update_fields)
         return redirect("profile")
     context = _social_context(request, "settings")
     context["profile"] = UserProfile.objects.filter(user=request.user).first()
@@ -963,8 +1360,53 @@ def delete_comment(request, comment_id):
 
 
 def map_view(request):
+    places = Place.objects.filter(owner=request.user) if request.user.is_authenticated else Place.objects.none()
+    map_posts = TravelPhoto.objects.none()
+    if request.user.is_authenticated:
+        outgoing_friend_ids = set(Friendship.objects.filter(
+            user=request.user, status="accepted",
+        ).values_list("friend_id", flat=True))
+        incoming_friend_ids = set(Friendship.objects.filter(
+            friend=request.user, status="accepted",
+        ).values_list("user_id", flat=True))
+        friend_ids = outgoing_friend_ids & incoming_friend_ids
+        map_posts = TravelPhoto.objects.filter(
+            Q(author=request.user) | Q(travel__owner=request.user) | Q(author_id__in=friend_ids),
+            place__isnull=False,
+        ).select_related("place", "travel", "author").order_by("-created_at")
     return render(request, "diary/map.html", _social_context(request, "map") | {
-        "places": Place.objects.filter(owner=request.user) if request.user.is_authenticated else Place.objects.none(),
+        "places": places,
+        "map_posts": map_posts,
+    })
+
+
+def photo_detail(request, photo_id):
+    photo = get_object_or_404(
+        TravelPhoto.objects.select_related(
+            "travel", "place", "author", "author__travel_profile", "journal_entry",
+        ).prefetch_related(
+            "tags", "likes", "comments__author", "comments__likes",
+            "comments__replies__author", "comments__replies__likes",
+        ),
+        pk=photo_id,
+    )
+    is_owner = request.user.is_authenticated and (
+        photo.author_id == request.user.id or photo.travel.owner_id == request.user.id
+    )
+    is_friend = False
+    if request.user.is_authenticated and photo.author_id and not is_owner:
+        is_friend = (
+            Friendship.objects.filter(
+                user=request.user, friend_id=photo.author_id, status="accepted",
+            ).exists()
+            and Friendship.objects.filter(
+                user_id=photo.author_id, friend=request.user, status="accepted",
+            ).exists()
+        )
+    if not is_owner and not is_friend:
+        raise Http404
+    return render(request, "diary/photo_detail.html", _social_context(request, "map") | {
+        "photo": photo,
     })
 
 

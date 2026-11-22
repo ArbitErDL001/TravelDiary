@@ -67,6 +67,7 @@
             <label>Last name<input name="last_name" value="{{ request.user.last_name }}" autocomplete="family-name"></label>
           </div>
           <label>Email address<input type="email" name="email" value="{{ request.user.email }}" placeholder="you@example.com" autocomplete="email"></label>
+          <label for="bio">Bio<textarea id="bio" name="bio" rows="3" maxlength="500" placeholder="Share a little about yourself.">{{ profile.bio|default:"" }}</textarea></label>
           <div class="settings-form-actions">
             <small>Changes update your profile immediately.</small>
             <button class="primary-button" type="submit">Save changes</button>

@@ -14,8 +14,17 @@
     .leaflet-container{font:11px/1.5 "Inter",sans-serif}
     .leaflet-control-zoom a{color:#6033b4!important}
     .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#fff}
-    .leaflet-popup-content{margin:12px 14px;color:var(--ink)}
-    .map-popup strong{font-size:12px}.map-popup p{margin-top:4px;color:var(--muted);font-size:10px}
+    .leaflet-popup-content{width:min(300px,72vw)!important;margin:12px 14px;color:var(--ink)}
+    .map-popup h3{margin:0 0 8px;font-size:12px}
+    .map-post{display:grid;grid-template-columns:58px 1fr;gap:9px;padding:9px 0;border-top:1px solid var(--border);color:var(--ink);text-decoration:none}
+    .map-post img,.map-post-placeholder{width:58px;height:58px;border-radius:8px;object-fit:cover}
+    .map-post-placeholder{display:grid;place-items:center;background:var(--lavender);color:var(--purple);font-size:20px}
+    .map-post-copy{min-width:0}.map-post-copy strong{display:block;font-size:11px}
+    .map-post-copy small{display:block;margin-top:3px;color:var(--muted);font-size:9px}
+    .map-post-copy span{display:block;margin-top:5px;color:var(--purple);font-size:10px;font-weight:700}
+    .map-place{padding:6px 0;border-top:1px solid var(--border)}
+    .map-marker{display:grid;place-items:center;width:34px;height:34px;border:3px solid #fff;border-radius:50%;background:#7042bd;color:#fff;box-shadow:0 2px 8px #211b2d55;font-size:12px;font-weight:700}
+    .content:not(.page-leaving)>.map-hero,.content:not(.page-leaving)>.map-card{animation:none}
     @media(max-width:700px){.map-hero{display:block}.map-count{display:inline-block;margin-top:14px}#map{min-height:360px;height:62vh}}
   </style>
   <section class="map-hero">
@@ -25,44 +34,126 @@
       <p>See the places that make your travel story yours.</p>
     </div>
   </section>
-  <section class="map-card panel" aria-label="Saved travel locations">
+  <section class="map-card panel" aria-label="Saved travel locations and tagged posts">
     <header class="map-header">
-      <div><h2>Travel map</h2><p>Browse your saved locations and memories.</p></div>
-      <span class="map-count">{{ places|length }} place{{ places|length|pluralize }}</span>
+      <div><h2>Travel map</h2><p>Browse saved places and posts tagged with a location.</p></div>
+      <span class="map-count">{{ map_posts|length }} post{{ map_posts|length|pluralize }} · {{ places|length }} saved place{{ places|length|pluralize }}</span>
     </header>
-    <div id="map"></div>
+    <div id="map" aria-label="Map of saved places and tagged travel posts"></div>
   </section>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    const places = [
+    const savedPlaces = [
       {% for place in places %}
         {name: "{{ place.name|escapejs }}", lat: {{ place.latitude }}, lon: {{ place.longitude }}, description: "{{ place.description|escapejs }}"},
       {% endfor %}
     ];
-    const selectedParams = new URLSearchParams(window.location.search);
-    const selectedLatitude = Number(selectedParams.get("latitude"));
-    const selectedLongitude = Number(selectedParams.get("longitude"));
-    const selectedName = selectedParams.get("name");
-    if (selectedName && Number.isFinite(selectedLatitude) && Number.isFinite(selectedLongitude)) {
-      places.unshift({name: selectedName, lat: selectedLatitude, lon: selectedLongitude, description: "Daily Discover recommendation."});
+    const posts = [
+      {% for photo in map_posts %}
+        {
+          lat: {{ photo.place.latitude }},
+          lon: {{ photo.place.longitude }},
+          place: "{{ photo.place.name|escapejs }}",
+          caption: "{{ photo.caption|default:'A moment worth remembering'|escapejs }}",
+          travel: "{{ photo.travel.title|escapejs }}",
+          author: "{% if photo.author %}{{ photo.author.get_full_name|default:photo.author.username|escapejs }}{% else %}Traveler{% endif %}",
+          date: "{{ photo.created_at|date:'M j, Y'|escapejs }}",
+          image: "{% if photo.image %}{{ photo.image.url|escapejs }}{% endif %}",
+          url: "{% url 'photo_detail' photo.id %}"
+        },
+      {% endfor %}
+    ];
+    const groups = new Map();
+    const hasValidCoordinates = (lat, lon) =>
+      Number.isFinite(lat) && Number.isFinite(lon)
+      && Math.abs(lat) <= 85 && Math.abs(lon) <= 180;
+    const getGroup = (lat, lon) => {
+      const key = `${lat.toFixed(5)},${lon.toFixed(5)}`;
+      if (!groups.has(key)) groups.set(key, {lat, lon, places: [], posts: []});
+      return groups.get(key);
+    };
+    savedPlaces.forEach((place) => {
+      if (hasValidCoordinates(place.lat, place.lon)) getGroup(place.lat, place.lon).places.push(place);
+    });
+    posts.forEach((post) => {
+      if (hasValidCoordinates(post.lat, post.lon)) getGroup(post.lat, post.lon).posts.push(post);
+    });
+
+    const params = new URLSearchParams(window.location.search);
+    const selectedLat = Number(params.get("latitude"));
+    const selectedLon = Number(params.get("longitude"));
+    const selectedName = params.get("name");
+    if (selectedName && hasValidCoordinates(selectedLat, selectedLon)) {
+      const recommendation = getGroup(selectedLat, selectedLon);
+      recommendation.places.push({name: selectedName, description: "Daily Discover recommendation."});
     }
+
+    const latitudeLimit = 85;
+    const longitudeBoundsRadius = 360000;
+    let longitudeBoundsCenter = 0;
+    const getPanBounds = () => L.latLngBounds(
+      [[-latitudeLimit, longitudeBoundsCenter - longitudeBoundsRadius],
+       [latitudeLimit, longitudeBoundsCenter + longitudeBoundsRadius]]
+    );
     const map = L.map("map", {
-      worldCopyJump: false,
-      maxBounds: [[-85, -180], [85, 180]],
+      worldCopyJump: true,
+      maxBounds: getPanBounds(),
       maxBoundsViscosity: 1,
+      fadeAnimation: false,
       minZoom: 2
     });
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-      noWrap: true,
+    map.on("moveend", () => {
+      const longitude = map.getCenter().lng;
+      if (Math.abs(longitude - longitudeBoundsCenter) > longitudeBoundsRadius / 2) {
+        longitudeBoundsCenter = longitude;
+        map.setMaxBounds(getPanBounds());
+      }
+    });
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      subdomains: "abc",
       maxZoom: 19,
-      attribution: "&copy; OpenStreetMap contributors &copy; CARTO"
+      attribution: "&copy; OpenStreetMap contributors"
     }).addTo(map);
-    const markers = places.map((place) => L.marker([place.lat, place.lon])
-        .addTo(map)
-        .bindPopup(`<div class="map-popup"><strong>${place.name}</strong><p>${place.description || "Saved travel place."}</p></div>`));
-    if (places.length === 1) {
-      map.setView([places[0].lat, places[0].lon], 11);
-    } else if (places.length > 1) {
+
+    const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    })[character]);
+    const markers = [];
+    groups.forEach((group) => {
+      const marker = L.marker([group.lat, group.lon], {
+        icon: L.divIcon({
+          className: "",
+          html: `<span class="map-marker">${group.posts.length || "•"}</span>`,
+          iconSize: [34, 34],
+          iconAnchor: [17, 17]
+        })
+      });
+      if (group.posts.length) {
+        marker.on("click", () => {
+          if (marker.isPopupOpen()) window.location.assign(group.posts[0].url);
+        });
+      }
+
+      const placeNames = [...new Set(group.places.map((place) => place.name))];
+      const popup = `<div class="map-popup">
+        <h3>${escapeHtml(placeNames.join(" · ") || group.posts[0]?.place || "Travel location")}</h3>
+        ${group.places.map((place) => place.description
+          ? `<p class="map-place">${escapeHtml(place.description)}</p>` : "").join("")}
+        ${group.posts.map((post) => `<a class="map-post" href="${escapeHtml(post.url)}">
+          ${post.image ? `<img src="${escapeHtml(post.image)}" alt="">` : '<span class="map-post-placeholder">✧</span>'}
+          <span class="map-post-copy"><strong>${escapeHtml(post.caption)}</strong>
+            <small>${escapeHtml(post.author)} · ${escapeHtml(post.date)}<br>${escapeHtml(post.travel)}</small>
+            <span>Open post →</span>
+          </span>
+        </a>`).join("")}
+      </div>`;
+      marker.bindPopup(popup, {maxWidth: 340}).addTo(map);
+      markers.push(marker);
+    });
+
+    if (markers.length === 1) {
+      map.setView(markers[0].getLatLng(), 11);
+    } else if (markers.length > 1) {
       map.fitBounds(L.featureGroup(markers).getBounds(), {padding: [42, 42], maxZoom: 11});
     } else {
       map.setView([20, 0], 2);

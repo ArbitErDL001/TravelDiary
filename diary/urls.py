@@ -35,6 +35,7 @@ urlpatterns = [
     path("profile/data/<slug:category>/item/<int:record_id>/delete/", views.profile_data_view, {"action": "delete", "item": True}, name="profile_data_item_delete"),
     path("settings/", views.settings_view, name="settings"),
     path("photos/upload/", views.upload_photo, name="upload_photo"),
+    path("photos/<int:photo_id>/", views.photo_detail, name="photo_detail"),
     path("photos/<int:photo_id>/comments/", views.add_comment, name="add_comment"),
     path("photos/<int:photo_id>/edit/", views.edit_photo_caption, name="edit_photo_caption"),
     path("photos/<int:photo_id>/delete/", views.delete_photo, name="delete_photo"),

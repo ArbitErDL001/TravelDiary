@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from datetime import date
 from django.db.models import Q
 import requests
+import unicodedata
 
 from .models import (
     Accommodation, Activity, Country, Expense, ItineraryDay, JournalEntry,
@@ -359,11 +360,20 @@ def geocode(request):
     return Response(response.json())
 
 
+def _normalize_location_text(value):
+    return unicodedata.normalize(
+        "NFKD", str(value or ""),
+    ).encode("ascii", "ignore").decode("ascii").casefold()
+
+
 @api_view(["GET"])
 def photon_search(request):
     query = request.query_params.get("q", "").strip()
     if len(query) < 2:
         return Response({"features": []})
+    normalized_query = unicodedata.normalize("NFKD", query).encode("ascii", "ignore").decode("ascii").casefold()
+    query_terms = normalized_query.split()
+    country_search = request.query_params.get("kind") == "country"
     try:
         response = requests.get(
             "https://photon.komoot.io/api/",
@@ -380,11 +390,27 @@ def photon_search(request):
         country_code = (properties.get("countrycode") or "").upper()
         if not properties.get("name") or not country_code:
             continue
+        city = properties.get("city") or properties.get("town") or properties.get("village")
+        state = properties.get("state")
+        country = properties.get("country")
+        if country_search:
+            country_text = _normalize_location_text(country)
+            locality_text = _normalize_location_text(f"{city or ''} {state or ''}")
+            matches_query = normalized_query in country_text or (
+                bool(query_terms) and all(term in locality_text for term in query_terms)
+            )
+        else:
+            searchable_text = _normalize_location_text(
+                f"{properties['name']} {city or ''} {state or ''} {country or ''}",
+            )
+            matches_query = bool(query_terms) and all(term in searchable_text for term in query_terms)
+        if not matches_query:
+            continue
         features.append({
             "name": properties["name"],
-            "city": properties.get("city") or properties.get("town") or properties.get("village"),
-            "state": properties.get("state"),
-            "country": properties.get("country"),
+            "city": city,
+            "state": state,
+            "country": country,
             "country_code": country_code,
             "coordinates": feature.get("geometry", {}).get("coordinates", []),
         })

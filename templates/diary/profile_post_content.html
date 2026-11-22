@@ -1,6 +1,7 @@
-<article class="profile-post-view" data-profile-post data-photo-id="{{ photo.id }}">
+<article class="profile-post-view" data-profile-post data-photo-id="{{ photo.id }}" data-authenticated="{% if request.user.is_authenticated %}true{% else %}false{% endif %}">
   <div class="profile-post-media">
     {% if photo.image %}<button class="profile-post-image-button" type="button" data-fullscreen-photo aria-label="View full-size photo"><img src="{{ photo.image.url }}" alt="{{ photo.caption|default:'Travel memory' }}"></button>{% else %}<div class="memory-placeholder" aria-hidden="true">✧</div>{% endif %}
+    {% if photo.credit_url %}<details class="photo-credit-popover profile-photo-credit"><summary aria-label="Show photo credit" title="Show photo credit">!</summary><div class="photo-credit-popover-content"><strong>Photo credit</strong><a href="{{ photo.credit_url }}" target="_blank" rel="noopener noreferrer">{{ photo.credit_display }}</a></div></details>{% endif %}
   </div>
   <div class="profile-post-details">
     <header class="profile-post-author">
@@ -11,22 +12,42 @@
       <h2>{{ photo.caption|default:"A moment worth remembering" }}</h2>
       <p>{{ photo.travel.title }}{% if photo.place %} · {{ photo.place.name }}{% endif %}</p>
     </div>
-    <button class="profile-post-like{% if request.user in photo.likes.all %} liked{% endif %}" type="button" data-profile-post-like data-photo-id="{{ photo.id }}" aria-pressed="{% if request.user in photo.likes.all %}true{% else %}false{% endif %}">
-      <svg><use href="#heart"/></svg><span data-like-count>{{ photo.likes.count }}</span> likes
-    </button>
+    {% if photo.journal_entry %}<section class="post-shared-journal"><strong>{{ photo.journal_entry.title }}</strong><p>{{ photo.journal_entry.body|linebreaksbr }}</p></section>{% endif %}
+    {% if photo.tags.all %}<div class="post-shared-tags" aria-label="Journey tags">{% for tag in photo.tags.all %}<span>#{{ tag.name }}</span>{% endfor %}</div>{% endif %}
+    <div class="profile-post-actions" role="group" aria-label="Post actions">
+      <button class="profile-post-like{% if request.user.is_authenticated and request.user in photo.likes.all %} liked{% endif %}" type="button" data-profile-post-like data-photo-id="{{ photo.id }}" aria-pressed="{% if request.user.is_authenticated and request.user in photo.likes.all %}true{% else %}false{% endif %}" aria-label="Like post">
+        <svg><use href="#heart"/></svg><span data-like-count>{{ photo.likes.count }}</span><span>Like</span>
+      </button>
+      <button class="profile-post-action" type="button" data-profile-post-comment-focus aria-label="Jump to comments, {{ photo.comments.count }} comments">
+        <svg><use href="#comment"/></svg><span data-comment-count>{{ photo.comments.count }}</span><span>Comment</span>
+      </button>
+      <button class="profile-post-action profile-post-save" type="button" data-profile-post-save data-photo-id="{{ photo.id }}" aria-label="Save post" aria-pressed="false">
+        <svg><use href="#bookmark"/></svg><span data-save-label>Save</span>
+      </button>
+      <button class="profile-post-action" type="button" data-profile-post-share data-photo-id="{{ photo.id }}" aria-label="Share post">
+        <svg><use href="#send"/></svg><span>Share</span>
+      </button>
+    </div>
     <section class="profile-post-comments-section" aria-label="Comments">
       <h3>Comments</h3>
       <div class="profile-post-comments" data-profile-post-comments>
         {% for comment in photo.comments.all %}
           {% if not comment.parent_id %}
-            <article class="profile-post-comment"><strong>{% if comment.author %}{{ comment.author.username }}{% elif comment.guest_name %}{{ comment.guest_name }}{% else %}Guest{% endif %}</strong><p>{{ comment.body }}</p></article>
-            {% for reply in comment.replies.all %}<article class="profile-post-comment profile-post-reply"><strong>{% if reply.author %}{{ reply.author.username }}{% elif reply.guest_name %}{{ reply.guest_name }}{% else %}Guest{% endif %}</strong><p>{{ reply.body }}</p></article>{% endfor %}
+            <div class="profile-post-comment-thread" data-comment-thread-id="{{ comment.id }}">
+              <article class="profile-post-comment" data-comment-id="{{ comment.id }}"><strong>{% if comment.author %}{{ comment.author.username }}{% elif comment.guest_name %}{{ comment.guest_name }}{% else %}Guest{% endif %}</strong><p>{{ comment.body }}</p>
+                {% if request.user.is_authenticated %}<div class="profile-post-comment-actions"><button class="profile-post-comment-like{% if request.user in comment.likes.all %} liked{% endif %}" type="button" data-comment-like-url="{% url 'like_comment' comment.id %}" aria-pressed="{% if request.user in comment.likes.all %}true{% else %}false{% endif %}"><svg><use href="#heart"/></svg><span>{{ comment.likes.count }}</span></button><button class="profile-post-reply-button" type="button" data-profile-post-reply data-comment-id="{{ comment.id }}" data-comment-author="{% if comment.author %}{{ comment.author.username|escape }}{% elif comment.guest_name %}{{ comment.guest_name|escape }}{% else %}Guest{% endif %}">Reply</button></div>{% endif %}
+              </article>
+              {% for reply in comment.replies.all %}<article class="profile-post-comment profile-post-reply" data-comment-id="{{ reply.id }}"><strong>{% if reply.author %}{{ reply.author.username }}{% elif reply.guest_name %}{{ reply.guest_name }}{% else %}Guest{% endif %}</strong><p>{{ reply.body }}</p>{% if request.user.is_authenticated %}<div class="profile-post-comment-actions"><button class="profile-post-comment-like{% if request.user in reply.likes.all %} liked{% endif %}" type="button" data-comment-like-url="{% url 'like_comment' reply.id %}" aria-pressed="{% if request.user in reply.likes.all %}true{% else %}false{% endif %}"><svg><use href="#heart"/></svg><span>{{ reply.likes.count }}</span></button></div>{% endif %}</article>{% endfor %}
+            </div>
           {% endif %}
         {% empty %}<p class="profile-post-empty">No comments yet. Start the conversation.</p>
         {% endfor %}
       </div>
       {% if request.user.is_authenticated %}
         <form class="profile-post-comment-form" data-profile-post-comment-form>
+          {% csrf_token %}
+          <input type="hidden" name="parent" value="">
+          <p class="profile-post-replying" data-profile-post-replying hidden>Replying to <strong></strong><button type="button" data-profile-post-cancel-reply>Cancel</button></p>
           <label class="profile-post-comment-label" for="profile-post-comment-{{ photo.id }}">Write a comment</label>
           <textarea id="profile-post-comment-{{ photo.id }}" name="body" maxlength="1000" placeholder="Write a comment..." required></textarea>
           <button type="submit">Post</button>
