@@ -5,7 +5,9 @@ from urllib.parse import urlencode
 
 import requests
 from django import forms
+from django.conf import settings
 from django.contrib.auth import authenticate, login, logout
+from django.contrib import messages
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
@@ -557,6 +559,7 @@ def add_memory(request):
         "journal_entry_form": journal_entry_form,
         "journey_tags_form": journey_tags_form,
         "new_place_form": new_place_form,
+        "maptiler_api_key": settings.MAPTILER_API_KEY,
     })
     if request.method == "POST":
         if not request.user.is_authenticated:
@@ -584,14 +587,15 @@ def add_memory(request):
             if not new_journey_form.is_valid():
                 errors.append("Check the new journey details.")
         elif travel_value:
-            travel = get_object_or_404(Travel, pk=travel_value, owner=request.user)
+            if travel_value != "__quick__":
+                travel = get_object_or_404(Travel, pk=travel_value, owner=request.user)
         else:
-            errors.append("Choose a journey or create a new one.")
+            errors.append("Choose how to save this post.")
 
         if place_value == "__new__":
             new_place_form = InlinePlaceForm(request.POST, prefix="new_place")
             if not new_place_form.is_valid():
-                errors.append("Choose a place recommendation so its map coordinates are included.")
+                errors.append("Pin a location on the map and confirm it so its coordinates are included.")
         elif place_value:
             place = get_object_or_404(Place, pk=place_value, owner=request.user)
         else:
@@ -600,6 +604,11 @@ def add_memory(request):
         image = request.FILES.get("image")
         if image is None:
             errors.append("Choose a photo to share.")
+        else:
+            try:
+                forms.ImageField().clean(image)
+            except ValidationError as error:
+                errors.extend(error.messages)
         tag_ids = request.POST.getlist("tags")
         allowed_tags = Tag.objects.filter(
             Q(owner=request.user) | Q(travels__owner=request.user)
@@ -649,6 +658,26 @@ def add_memory(request):
                             owner=request.user, name=country_name, code=country_code,
                         )
                     travel.countries.add(country)
+            elif travel_value == "__quick__":
+                travel = Travel.objects.filter(
+                    owner=request.user,
+                    title="My memories",
+                ).order_by("id").first()
+                if travel is None:
+                    today = timezone.localdate()
+                    travel = Travel.objects.create(
+                        owner=request.user,
+                        title="My memories",
+                        start_date=today,
+                        end_date=today,
+                        status="completed",
+                        description=private_trip_details_form.cleaned_data["details"].strip(),
+                    )
+                else:
+                    details = private_trip_details_form.cleaned_data["details"].strip()
+                    if details:
+                        travel.description = details
+                        travel.save(update_fields=["description"])
             else:
                 details = private_trip_details_form.cleaned_data["details"].strip()
                 if details:
@@ -701,6 +730,20 @@ def add_memory(request):
                     tag = Tag.objects.create(owner=request.user, name=name)
                 tag.travels.add(travel)
                 photo.tags.add(tag)
+            Notification.objects.create(
+                recipient=request.user,
+                actor=request.user,
+                photo=photo,
+                kind="post",
+            )
+        messages.success(request, "Your photo has been uploaded successfully.")
+        next_url = request.POST.get("next", "")
+        if url_has_allowed_host_and_scheme(
+            next_url,
+            allowed_hosts={request.get_host()},
+            require_https=request.is_secure(),
+        ):
+            return redirect(next_url)
         return redirect("dashboard")
     return render(request, "diary/add_memory.html", context)
 
@@ -1377,6 +1420,7 @@ def map_view(request):
     return render(request, "diary/map.html", _social_context(request, "map") | {
         "places": places,
         "map_posts": map_posts,
+        "maptiler_api_key": settings.MAPTILER_API_KEY,
     })
 
 
@@ -1452,6 +1496,7 @@ def _notifications(request=None):
                     "comment": "commented on your travel diary",
                     "follow": "followed you",
                     "friend_accepted": "accepted your friend request",
+                    "post": "posted a new memory",
                 }.get(item.kind, "interacted with you"),
                 "photo": item.photo,
                 "user": item.actor,
@@ -1507,8 +1552,15 @@ def _notifications(request=None):
 
 def diary_view(request):
     context = _social_context(request, "diary")
-    entries = list(TravelPhoto.objects.select_related("travel", "place").prefetch_related("comments").all())
-    context["entries"] = entries
+    photo_query = TravelPhoto.objects.select_related(
+        "travel", "place", "author",
+    ).prefetch_related("comments", "likes")
+    if request.user.is_authenticated:
+        context["entries"] = list(photo_query.filter(author=request.user))
+        context["liked_entries"] = list(photo_query.filter(likes=request.user).distinct())
+    else:
+        context["entries"] = []
+        context["liked_entries"] = []
     return render(request, "diary/diary.html", context)
 
 

@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views
-from .api import geocode, nearby_recommendations, photon_search, weather
+from .api import geocode, nearby_recommendations, photon_search, reverse_geocode, weather
 
 urlpatterns = [
     path("", views.landing, name="landing"),
@@ -44,6 +44,7 @@ urlpatterns = [
     path("comments/<int:comment_id>/like/", views.like_comment, name="like_comment"),
     path("map/", views.map_view, name="map"),
     path("api/geocode/", geocode, name="geocode"),
+    path("api/reverse-geocode/", reverse_geocode, name="reverse_geocode"),
     path("api/photon/", photon_search, name="photon_search"),
     path("api/recommendations/nearby/", nearby_recommendations, name="nearby_recommendations"),
     path("api/weather/", weather, name="weather"),

@@ -97,6 +97,28 @@
 
         <section class="profile-section" id="posted" aria-labelledby="posted-title">
           <div class="section-title"><h2 id="posted-title">Posted memories</h2><small>{% if is_profile_owner %}Stories you shared{% else %}{{ profile_user.get_full_name|default:profile_user.username }}'s shared stories{% endif %}</small></div>
+          {% if is_profile_owner %}
+            <form class="profile-quick-upload panel" method="post" action="{% url 'add_memory' %}" enctype="multipart/form-data">
+              {% csrf_token %}
+              <input type="hidden" name="travel" value="__quick__">
+              <input type="hidden" name="next" value="{% url 'profile' %}">
+              <label class="photo-upload-label">Photo
+                <span class="file-picker">
+                  <input id="profile-quick-image" type="file" name="image" accept="image/*" aria-label="Choose a photo to upload" aria-describedby="profile-quick-upload-status" required>
+                  <span class="file-picker-button" data-profile-upload-picker-label>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 7h3l1.5-2h7L17 7h3v12H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+                    <span data-profile-upload-picker-label-text>Choose a photo</span>
+                  </span>
+                </span>
+              </label>
+              <label>Caption <input type="text" name="caption" maxlength="255" placeholder="What will you remember?"></label>
+              <button class="primary-button" type="submit">Upload memory</button>
+              <div class="profile-quick-upload-preview" data-profile-upload-preview hidden>
+                <img data-profile-upload-image alt="Preview of the selected memory photo">
+              </div>
+              <p class="profile-quick-upload-status" id="profile-quick-upload-status" data-profile-upload-status role="status" aria-live="polite">Your photo will appear in your diary and feed.</p>
+            </form>
+          {% endif %}
           <div class="profile-grid">
             {% for photo in posted_photos %}
               <article class="profile-photo panel">
@@ -137,4 +159,44 @@
       <script src="{% static 'diary/photo-post.js' %}?v=2"></script>{% endif %}
     {% endif %}
   </div>
+  {% if is_profile_owner %}
+    <script>
+      (() => {
+        const input = document.querySelector("#profile-quick-image");
+        const preview = document.querySelector("[data-profile-upload-preview]");
+        const image = document.querySelector("[data-profile-upload-image]");
+        const status = document.querySelector("[data-profile-upload-status]");
+        const pickerLabel = document.querySelector("[data-profile-upload-picker-label-text]");
+        let previewUrl = "";
+
+        input.addEventListener("change", () => {
+          const file = input.files[0];
+          if (previewUrl) URL.revokeObjectURL(previewUrl);
+          previewUrl = "";
+          preview.hidden = true;
+          image.removeAttribute("src");
+          if (!file) {
+            pickerLabel.textContent = "Choose a photo";
+            status.textContent = "Your photo will appear in your diary and feed.";
+            return;
+          }
+          if (file.type && !file.type.startsWith("image/")) {
+            input.value = "";
+            pickerLabel.textContent = "Choose a photo";
+            status.textContent = "Choose a valid image file.";
+            return;
+          }
+          previewUrl = URL.createObjectURL(file);
+          image.src = previewUrl;
+          preview.hidden = false;
+          pickerLabel.textContent = "Change photo";
+          status.textContent = file.name;
+        });
+
+        window.addEventListener("pagehide", () => {
+          if (previewUrl) URL.revokeObjectURL(previewUrl);
+        });
+      })();
+    </script>
+  {% endif %}
 {% endblock %}

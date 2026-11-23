@@ -1,4 +1,6 @@
 {% extends "diary/base.html" %}
+{% load static %}
+{% block extra_head %}<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">{% endblock %}
 {% block title %}Add a memory — Roam{% endblock %}
 {% block breadcrumb %}Add a memory{% endblock %}
 {% block content %}
@@ -8,14 +10,23 @@
     <form action="{% url 'add_memory' %}" method="post" enctype="multipart/form-data">
       {% csrf_token %}
       {% if memory_errors %}<ul class="form-errors" role="alert">{% for error in memory_errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
-      <label class="photo-upload-label"><span>Photo</span><span class="file-picker"><input id="memory-image" type="file" name="image" accept="image/*" required><span class="file-picker-button">Upload photo</span></span></label>
+      <label class="photo-upload-label"><span>Photo</span><span class="file-picker"><input id="memory-image" type="file" name="image" accept="image/*" aria-label="Choose a photo to share" aria-describedby="memory-image-status" required><span class="file-picker-button" data-photo-picker-label>Choose a photo</span></span></label>
+      <div class="photo-upload-preview" data-photo-preview hidden>
+        <img data-photo-preview-image alt="Preview of the selected travel photo">
+        <div class="photo-upload-preview-details">
+          <span data-photo-name></span>
+          <button type="button" data-remove-photo aria-label="Remove selected photo">Remove photo</button>
+        </div>
+      </div>
+      <p class="photo-upload-status" id="memory-image-status" aria-live="polite">Choose an image file to preview it here.</p>
       <label>Journey
-        <select id="memory-travel" name="travel" required>
-          <option value="" disabled {% if not photo_travels %}selected{% endif %}>Choose a journey</option>
+        <select id="memory-travel" name="travel">
+          <option value="__quick__"{% if not request.POST.travel or request.POST.travel == "__quick__" %} selected{% endif %}>Quick post — save to My memories</option>
           {% for travel in photo_travels %}<option value="{{ travel.id }}" data-private-details="{{ travel.description }}"{% if request.POST.travel == travel.id|stringformat:"s" %} selected{% endif %}>{{ travel.title }}</option>{% endfor %}
           <option value="__new__"{% if request.POST.travel == "__new__" %} selected{% endif %}>＋ Create a new journey</option>
         </select>
       </label>
+      <p class="memory-field-hint">Just sharing a moment? Your post will be filed under your “My memories” journey.</p>
       <div class="memory-inline-fields" data-inline-journey hidden>
         <p class="memory-field-hint">Add your journey dates now. Country is optional.</p>
         <label>{{ new_journey_form.title.label }} {{ new_journey_form.title }}</label>{{ new_journey_form.title.errors }}
@@ -34,23 +45,34 @@
       </label>
       <p class="memory-field-hint">Saved to your private travel data only; it will not appear with your public post.</p>
       {{ private_trip_details_form.details.errors }}
-      <label>Place
-        <select id="memory-place" name="place">
-          <option value="">No location</option>
-          {% for place in photo_places %}<option value="{{ place.id }}"{% if request.POST.place == place.id|stringformat:"s" %} selected{% endif %}>{{ place.name }}</option>{% endfor %}
-          <option value="__new__"{% if request.POST.place == "__new__" %} selected{% endif %}>＋ Search and add a new place</option>
-        </select>
-      </label>
-      <div class="memory-inline-fields" data-inline-place hidden>
-        <p class="memory-field-hint">Type a city, landmark, or address, then choose a recommendation to save its map location.</p>
-        <label for="{{ new_place_form.name.id_for_label }}">{{ new_place_form.name.label }}</label>
-        <div data-location-container>{{ new_place_form.name }}<div class="location-suggestions" data-location-suggestions role="listbox" hidden></div></div>
-        {{ new_place_form.name.errors }}
-        <label>{{ new_place_form.address.label }} {{ new_place_form.address }}</label>{{ new_place_form.address.errors }}
-        {{ new_place_form.latitude }}{{ new_place_form.latitude.errors }}
-        {{ new_place_form.longitude }}{{ new_place_form.longitude.errors }}
+      <div class="memory-place-picker">
+        <p class="memory-field-hint">Search for a city or landmark to jump to it, or click the map. Adjust the pin as needed, then confirm the location before sharing.</p>
+        <label for="memory-place-search">Search for a location</label>
+        <div class="memory-place-search-container" data-location-container>
+          <input id="memory-place-search" type="search" placeholder="Try a city, landmark, or address" autocomplete="off"
+            data-location-autocomplete="place"
+            data-location-address-target="#id_new_place-address"
+            data-location-latitude-target="#id_new_place-latitude"
+            data-location-longitude-target="#id_new_place-longitude">
+          <div class="location-suggestions" data-location-suggestions role="listbox" hidden></div>
+        </div>
+        <div id="memory-place-map" class="memory-place-map" data-place-map
+          data-maptiler-api-key="{{ maptiler_api_key }}" aria-label="Map location picker"></div>
+        <div class="memory-place-map-tools">
+          <span data-place-map-status role="status" aria-live="polite">Click the map to choose a location.</span>
+          <div class="memory-place-map-actions">
+            <button type="button" class="secondary-button" data-place-map-confirm disabled>Confirm location</button>
+            <button type="button" class="secondary-button" data-place-map-clear>Clear pin</button>
+          </div>
+        </div>
+        <p class="memory-place-confirmation" data-place-confirmation role="status" hidden></p>
       </div>
-      <label>Caption <textarea name="caption" maxlength="255" rows="4" placeholder="What will you remember?"></textarea></label>
+      <input id="memory-place" type="hidden" name="place" value="{{ request.POST.place|default:'' }}">
+      {{ new_place_form.name.as_hidden }}
+      {{ new_place_form.address.as_hidden }}
+      {{ new_place_form.latitude }}
+      {{ new_place_form.longitude }}
+      <label>Caption <textarea name="caption" maxlength="255" rows="4" placeholder="What will you remember?">{{ request.POST.caption }}</textarea></label>
       <fieldset class="memory-record-group">
         <legend>Private travel records</legend>
         <p class="memory-field-hint">Accommodation and expenses are saved to your journey and never shown with the post.</p>
@@ -68,9 +90,57 @@
   </section>
   <script>
     (() => {
+      const photoInput = document.querySelector("#memory-image");
+      const photoPreview = document.querySelector("[data-photo-preview]");
+      const previewImage = photoPreview.querySelector("[data-photo-preview-image]");
+      const photoName = photoPreview.querySelector("[data-photo-name]");
+      const photoStatus = document.querySelector("#memory-image-status");
+      const pickerLabel = document.querySelector("[data-photo-picker-label]");
+      let previewUrl = "";
+
+      const clearPhoto = (message) => {
+        photoInput.value = "";
+        photoPreview.hidden = true;
+        previewImage.onerror = null;
+        previewImage.onload = null;
+        previewImage.removeAttribute("src");
+        photoName.textContent = "";
+        pickerLabel.textContent = "Choose a photo";
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        previewUrl = "";
+        if (message) photoStatus.textContent = message;
+      };
+
+      photoInput.addEventListener("change", () => {
+        const file = photoInput.files[0];
+        if (!file) {
+          clearPhoto("Choose an image file to preview it here.");
+          return;
+        }
+        if (file.type && !file.type.startsWith("image/")) {
+          clearPhoto("That file is not an image. Choose an image to continue.");
+          return;
+        }
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        previewUrl = URL.createObjectURL(file);
+        photoName.textContent = file.name;
+        photoPreview.hidden = false;
+        photoStatus.textContent = "Loading photo preview…";
+        previewImage.onerror = () => clearPhoto("This file could not be previewed. Choose a valid image.");
+        previewImage.onload = () => { photoStatus.textContent = "Photo ready to share."; };
+        previewImage.src = previewUrl;
+        pickerLabel.textContent = "Change photo";
+      });
+
+      document.querySelector("[data-remove-photo]").addEventListener("click", () => {
+        clearPhoto("Photo removed. Choose an image file to preview it here.");
+      });
+      window.addEventListener("pagehide", () => {
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+      });
+
       const toggles = [
         [document.querySelector("#memory-travel"), document.querySelector("[data-inline-journey]")],
-        [document.querySelector("#memory-place"), document.querySelector("[data-inline-place]")],
       ];
       const travelSelect = document.querySelector("#memory-travel");
       const privateDetails = document.querySelector("#id_details");
@@ -81,10 +151,17 @@
         });
       }
       toggles.forEach(([select, fields]) => {
-        const update = () => { fields.hidden = select.value !== "__new__"; };
+        const requiredControls = Array.from(fields.querySelectorAll("[required]"));
+        const update = () => {
+          const visible = select.value === "__new__";
+          fields.hidden = !visible;
+          requiredControls.forEach((control) => { control.required = visible; });
+        };
         select.addEventListener("change", update);
         update();
       });
     })();
   </script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="{% static 'diary/memory-place-map.js' %}?v=13"></script>
 {% endblock %}

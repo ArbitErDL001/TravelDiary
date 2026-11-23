@@ -36,10 +36,12 @@
   </section>
   <section class="map-card panel" aria-label="Saved travel locations and tagged posts">
     <header class="map-header">
-      <div><h2>Travel map</h2><p>Browse saved places and posts tagged with a location.</p></div>
+      <div><h2>Travel map</h2><p>Browse saved places and posts tagged with a location.
+        {% if maptiler_api_key %}Map tiles by MapTiler and OpenStreetMap.{% else %}Configure MAPTILER_API_KEY to load MapTiler tiles.{% endif %}
+      </p></div>
       <span class="map-count">{{ map_posts|length }} post{{ map_posts|length|pluralize }} · {{ places|length }} saved place{{ places|length|pluralize }}</span>
     </header>
-    <div id="map" aria-label="Map of saved places and tagged travel posts"></div>
+    <div id="map" data-maptiler-api-key="{{ maptiler_api_key }}" aria-label="Map of saved places and tagged travel posts"></div>
   </section>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
@@ -88,32 +90,30 @@
       recommendation.places.push({name: selectedName, description: "Daily Discover recommendation."});
     }
 
-    const latitudeLimit = 85;
-    const longitudeBoundsRadius = 360000;
-    let longitudeBoundsCenter = 0;
-    const getPanBounds = () => L.latLngBounds(
-      [[-latitudeLimit, longitudeBoundsCenter - longitudeBoundsRadius],
-       [latitudeLimit, longitudeBoundsCenter + longitudeBoundsRadius]]
-    );
+    const worldBounds = L.latLngBounds([[-85.051129, -180], [85.051129, 180]]);
     const map = L.map("map", {
-      worldCopyJump: true,
-      maxBounds: getPanBounds(),
+      worldCopyJump: false,
+      maxBounds: worldBounds,
       maxBoundsViscosity: 1,
       fadeAnimation: false,
-      minZoom: 2
+      minZoom: 2,
+      zoomControl: false,
+      scrollWheelZoom: true
     });
-    map.on("moveend", () => {
-      const longitude = map.getCenter().lng;
-      if (Math.abs(longitude - longitudeBoundsCenter) > longitudeBoundsRadius / 2) {
-        longitudeBoundsCenter = longitude;
-        map.setMaxBounds(getPanBounds());
-      }
-    });
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      subdomains: "abc",
-      maxZoom: 19,
-      attribution: "&copy; OpenStreetMap contributors"
-    }).addTo(map);
+    L.control.zoom({position: "topright"}).addTo(map);
+    const refreshMapSize = () => window.requestAnimationFrame(() => map.invalidateSize({pan: false}));
+    if ("ResizeObserver" in window) new ResizeObserver(refreshMapSize).observe(map.getContainer());
+    window.addEventListener("resize", refreshMapSize, {passive: true});
+    const mapTilerApiKey = map.getContainer().dataset.maptilerApiKey;
+    if (mapTilerApiKey) {
+      const tiles = `https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${encodeURIComponent(mapTilerApiKey)}`;
+      L.tileLayer(tiles, {
+        noWrap: true,
+        bounds: worldBounds,
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.maptiler.com/copyright/" target="_blank">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap contributors</a>'
+      }).addTo(map);
+    }
 
     const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => ({
       "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
@@ -158,5 +158,6 @@
     } else {
       map.setView([20, 0], 2);
     }
+    refreshMapSize();
   </script>
 {% endblock %}

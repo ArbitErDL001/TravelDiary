@@ -2032,16 +2032,137 @@ h1 span {
     justify-self: start
 }
 
-.memory-form-card #memory-image {
-    display: none !important
+.memory-form-card .file-picker {
+    position: relative;
+    min-height: 58px
 }
 
-.memory-form-card .file-picker {
-    min-height: 58px
+.memory-form-card .file-picker input[type=file] {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    opacity: 0;
+    cursor: pointer
+}
+
+.memory-form-card .file-picker:focus-within {
+    outline: 3px solid #7846d64d;
+    outline-offset: 3px
 }
 
 .memory-form-card .file-picker-button {
     width: 100%
+}
+
+.photo-upload-preview {
+    display: grid;
+    gap: 10px;
+    padding: 10px;
+    border: 1px solid #e7e0ef;
+    border-radius: 12px;
+    background: #faf8ff
+}
+
+.photo-upload-preview[hidden] {
+    display: none
+}
+
+.photo-upload-preview img {
+    display: block;
+    width: 100%;
+    max-height: 320px;
+    border-radius: 8px;
+    object-fit: contain;
+    background: #f0edf5
+}
+
+.photo-upload-preview-details {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-width: 0;
+    color: var(--ink);
+    font-size: 11px
+}
+
+.photo-upload-preview-details span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap
+}
+
+.photo-upload-preview-details button {
+    flex: 0 0 auto;
+    padding: 6px 9px;
+    border: 1px solid #e7e0ef;
+    border-radius: 7px;
+    background: #fff;
+    color: var(--ink);
+    font: inherit;
+    cursor: pointer
+}
+
+.photo-upload-status {
+    margin: -10px 0 0;
+    color: var(--muted);
+    font-size: 10px
+}
+
+.upload-success-dialog {
+    width: min(360px, calc(100vw - 32px));
+    padding: 0;
+    border: 0;
+    border-radius: 14px;
+    background: var(--panel, #fff);
+    color: var(--ink);
+    box-shadow: 0 18px 56px #211b2d40
+}
+
+.upload-success-dialog::backdrop {
+    background: rgb(25 20 34 / 34%);
+    backdrop-filter: blur(2px)
+}
+
+.upload-success-content {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+    padding: 20px
+}
+
+.upload-success-icon {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #e9f8ef;
+    color: #218548;
+    font-weight: 700
+}
+
+.upload-success-content h2 {
+    margin: 0 0 4px;
+    font-size: 14px
+}
+
+.upload-success-content p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.5
+}
+
+.upload-success-content button {
+    grid-column: 2;
+    justify-self: end;
+    min-width: 70px
 }
 
 .memory-inline-fields {
@@ -2061,6 +2182,73 @@ h1 span {
     color: var(--muted);
     font-size: 10px;
     line-height: 1.5
+}
+
+.memory-place-picker {
+    display: grid;
+    gap: 12px;
+    width: 100%;
+    min-width: 0
+}
+
+.memory-place-picker > p {
+    margin: 0
+}
+
+.memory-place-map-tools {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 10px
+}
+
+.memory-place-map-tools [role="status"] {
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.5
+}
+
+.memory-place-map-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px
+}
+
+.memory-place-map-actions button:disabled {
+    cursor: not-allowed;
+    opacity: .55;
+    transform: none
+}
+
+.memory-place-confirmation {
+    padding: 10px 12px;
+    border: 1px solid #cce4d5;
+    border-radius: 9px;
+    background: #effaf3;
+    color: #23643d;
+    font-size: 12px;
+    line-height: 1.5
+}
+
+.memory-place-confirmation[hidden] {
+    display: none
+}
+
+.memory-place-map {
+    width: 100%;
+    max-width: 100%;
+    height: clamp(320px, 55vh, 620px);
+    overflow: hidden;
+    border: 1px solid #e8e0f0;
+    border-radius: 12px;
+    background: #e8edf0;
+    box-sizing: border-box;
+    z-index: 0
+}
+
+.memory-place-map[hidden] {
+    display: none
 }
 
 .memory-record-group {
@@ -2414,7 +2602,8 @@ h1 span {
 
 .account-avatar {
     border: 1px solid #fff;
-    padding: 0
+    padding: 0;
+    cursor: pointer
 }
 
 .account-menu {
@@ -2430,6 +2619,17 @@ h1 span {
     box-shadow: 0 12px 30px #211b2d26
 }
 
+.top-account .account-menu {
+    right: 0;
+    bottom: auto;
+    left: auto;
+    top: calc(100% + 10px)
+}
+
+.top-account .account-avatar {
+    font: inherit
+}
+
 .account-menu a {
     display: block;
     padding: 10px;
@@ -2441,6 +2641,53 @@ h1 span {
 .account-menu a:hover {
     background: #f4effd;
     color: var(--purple)
+}
+
+.diary-liked-section {
+    margin-top: 40px
+}
+
+.diary-liked-section [data-liked-empty][hidden] {
+    display: none
+}
+
+.diary-like-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 8px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--muted);
+    font: inherit;
+    font-size: 11px;
+    cursor: pointer
+}
+
+.diary-like-button svg {
+    width: 16px;
+    height: 16px;
+    fill: transparent;
+    stroke: currentColor;
+    stroke-width: 1.8
+}
+
+.diary-like-button.liked {
+    color: #b52e66
+}
+
+.diary-like-button.liked svg {
+    fill: #b52e66
+}
+
+.diary-like-button:disabled {
+    opacity: .6;
+    cursor: wait
+}
+
+.diary-like-status:empty {
+    display: none
 }
 
 .profile-header {
@@ -3578,6 +3825,7 @@ progress::-moz-progress-bar {
 :root[data-theme="dark"] .panel,
 :root[data-theme="dark"] .stat,
 :root[data-theme="dark"] .account-menu,
+:root[data-theme="dark"] .upload-success-dialog,
 :root[data-theme="dark"] .notification-menu,
 :root[data-theme="dark"] .owner-menu,
 :root[data-theme="dark"] .travel-data-record,
@@ -4367,6 +4615,114 @@ progress::-moz-progress-bar {
 .profile-page .profile-section {
     max-width: none;
     margin-bottom: 28px
+}
+
+.profile-quick-upload {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding: 14px
+}
+
+.profile-quick-upload label {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+    color: var(--muted);
+    font-size: 11px
+}
+
+.profile-quick-upload input {
+    width: 100%;
+    min-width: 0;
+    padding: 9px;
+    border: 1px solid #e7e0ef;
+    border-radius: 9px;
+    background: #fff;
+    color: var(--ink);
+    font: inherit
+}
+
+.profile-quick-upload .primary-button {
+    min-height: 44px;
+    justify-content: center;
+    white-space: nowrap
+}
+
+.profile-quick-upload .file-picker {
+    min-height: 58px
+}
+
+.profile-quick-upload .file-picker input[type="file"] {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    opacity: 0;
+    cursor: pointer
+}
+
+.profile-quick-upload .file-picker:focus-within {
+    outline: 3px solid #7846d64d;
+    outline-offset: 3px
+}
+
+.profile-quick-upload .file-picker-button {
+    min-height: 42px
+}
+
+.profile-quick-upload .file-picker-button svg {
+    flex: 0 0 auto
+}
+
+.profile-quick-upload-preview {
+    grid-column: 1 / -1;
+    padding: 8px;
+    border: 1px solid #e7e0ef;
+    border-radius: 10px;
+    background: #faf8ff
+}
+
+.profile-quick-upload-preview[hidden] {
+    display: none
+}
+
+.profile-quick-upload-preview img {
+    display: block;
+    width: 100%;
+    max-height: 220px;
+    border-radius: 7px;
+    object-fit: contain
+}
+
+.profile-quick-upload-status {
+    grid-column: 1 / -1;
+    margin: -4px 0 0;
+    color: var(--muted);
+    font-size: 10px
+}
+
+@media (max-width:700px) {
+    .profile-quick-upload {
+        grid-template-columns: minmax(0, 1fr);
+        align-items: stretch
+    }
+
+    .profile-quick-upload .primary-button,
+    .profile-quick-upload-preview,
+    .profile-quick-upload-status {
+        grid-column: 1
+    }
+
+    .profile-quick-upload .primary-button {
+        width: 100%
+    }
 }
 
 .profile-page .profile-grid {
@@ -5401,6 +5757,16 @@ progress::-moz-progress-bar {
 :root[data-theme="dark"] .file-picker-button {
     background: #7047ad;
     color: #fff;
+}
+
+:root[data-theme="dark"] .profile-quick-upload .file-picker {
+    border-color: #514761;
+    background: #30283d;
+}
+
+:root[data-theme="dark"] .profile-quick-upload-preview {
+    border-color: #514761;
+    background: #30283d;
 }
 
 :root[data-theme="dark"] .travel-data-record .record-edit {

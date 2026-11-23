@@ -1,0 +1,19 @@
+{% if messages %}
+  <dialog class="upload-success-dialog" data-upload-success-dialog aria-labelledby="upload-success-title">
+    <div class="upload-success-content">
+      <span class="upload-success-icon" aria-hidden="true">✓</span>
+      <div>
+        <h2 id="upload-success-title">Upload complete</h2>
+        {% for message in messages %}<p>{{ message }}</p>{% endfor %}
+      </div>
+      <button class="primary-button" type="button" data-upload-success-close>OK</button>
+    </div>
+  </dialog>
+  <script>
+    (() => {
+      const dialog = document.querySelector("[data-upload-success-dialog]");
+      dialog.querySelector("[data-upload-success-close]").addEventListener("click", () => dialog.close());
+      dialog.showModal();
+    })();
+  </script>
+{% endif %}

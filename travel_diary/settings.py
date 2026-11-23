@@ -1,6 +1,13 @@
+import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+load_dotenv(BASE_DIR / ".env")
+
+MAPTILER_API_KEY = os.environ.get("MAPTILER_API_KEY", "").strip()
 SECRET_KEY = "django-insecure-change-this-in-production"
 DEBUG = True
 ALLOWED_HOSTS = ["127.0.0.1", "localhost", "testserver"]

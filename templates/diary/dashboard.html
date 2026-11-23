@@ -11,7 +11,7 @@
     <script>
       document.documentElement.dataset.theme = localStorage.getItem("roam-theme") || "light";
     </script>
-    <link rel="stylesheet" href="{% static 'diary/dashboard.css' %}?v=35">
+    <link rel="stylesheet" href="{% static 'diary/dashboard.css' %}?v=40">
   </head>
   <body>
     <svg class="svg-library" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -57,7 +57,27 @@
         <header class="topbar">
           <div class="breadcrumb"><strong>Your feed</strong><span>/</span><span>Overview</span></div>
           <a class="brand mobile-brand" href="{% url 'dashboard' %}"><span class="brand-mark">◎</span> roam.</a>
-          <div class="top-actions"><label class="search"><svg><use href="#search"/></svg><input id="feed-search" type="search" aria-label="Search" placeholder="Search places, people, memories"></label><div class="notification-wrap">                <button class="icon-button notification" aria-label="Notifications" type="button"><svg><use href="#bell"/></svg>{% if notification_count %}<span class="notification-count">{{ notification_count }}</span>{% endif %}</button><div class="notification-menu" hidden><div class="notification-menu-header"><div><strong>Notifications</strong><small>Stay in the loop</small></div><a href="{% url 'notifications' %}">View all <span>→</span></a></div>{% for item in notifications|slice:":4" %}{% if item.kind == "follow" or item.kind == "friend_accepted" %}<div class="notification-item"><span class="notification-icon"><svg><use href="#bell"/></svg></span><span class="notification-copy"><span><strong>{{ item.name }}</strong> {{ item.text }}</span><small>{{ item.time|timesince }} ago</small></span>{% if item.kind == "follow" or item.kind == "friend_accepted" %}        {% if item.follow_back_state == "available" %}<form method="post" action="{% url 'add_friend' item.user.id %}">{% csrf_token %}<button class="notification-follow-button" type="submit">Follow back</button></form>{% elif item.follow_back_state == "pending" %}<span class="notification-follow-button notification-accepted">Added friend</span>{% elif item.follow_back_state == "accepted" or item.kind == "friend_accepted" %}<span class="notification-follow-button notification-accepted">{% if item.kind == "friend_accepted" %}Accepted{% else %}Friends{% endif %}</span>{% endif %}{% endif %}{% if item.id %}<form class="notification-delete-form" method="post" action="{% url 'delete_notification' item.id %}">{% csrf_token %}<button class="notification-delete" type="submit" aria-label="Delete notification">×</button></form>{% endif %}</div>{% else %}<a class="notification-item" href="#post-{{ item.photo.id }}"><span class="notification-icon"><svg><use href="#bell"/></svg></span><span class="notification-copy"><span><strong>{{ item.name }}</strong> {{ item.text }}</span><small>{{ item.time|timesince }} ago · {{ item.photo.caption|default:"Travel memory"|truncatechars:34 }}</small></span><span class="notification-dot"></span></a>{% endif %}{% empty %}<div class="notification-empty"><span class="notification-empty-icon">✧</span><strong>All caught up</strong><p>No new activity from your circle.</p></div>{% endfor %}</div></div><a class="avatar" href="{% url 'profile' %}" aria-label="View profile">{% if user_avatar %}<img src="{{ user_avatar }}" alt="Profile photo">{% else %}{{ user_initials }}{% endif %}</a></div>
+          <div class="top-actions">
+            <label class="search"><svg><use href="#search"/></svg><input id="feed-search" type="search" aria-label="Search" placeholder="Search places, people, memories"></label>
+            <div class="notification-wrap">
+              <button class="icon-button notification" aria-label="Notifications" type="button"><svg><use href="#bell"/></svg>{% if notification_count %}<span class="notification-count">{{ notification_count }}</span>{% endif %}</button>
+              <div class="notification-menu" hidden>
+                <div class="notification-menu-header"><div><strong>Notifications</strong><small>Stay in the loop</small></div><a href="{% url 'notifications' %}">View all <span>→</span></a></div>
+                {% for item in notifications|slice:":4" %}
+                  {% if item.kind == "follow" or item.kind == "friend_accepted" %}
+                    <div class="notification-item"><span class="notification-icon"><svg><use href="#bell"/></svg></span><span class="notification-copy"><span><strong>{{ item.name }}</strong> {{ item.text }}</span><small>{{ item.time|timesince }} ago</small></span>{% if item.follow_back_state == "available" %}<form method="post" action="{% url 'add_friend' item.user.id %}">{% csrf_token %}<button class="notification-follow-button" type="submit">Follow back</button></form>{% elif item.follow_back_state == "pending" %}<span class="notification-follow-button notification-accepted">Added friend</span>{% elif item.follow_back_state == "accepted" or item.kind == "friend_accepted" %}<span class="notification-follow-button notification-accepted">{% if item.kind == "friend_accepted" %}Accepted{% else %}Friends{% endif %}</span>{% endif %}{% if item.id %}<form class="notification-delete-form" method="post" action="{% url 'delete_notification' item.id %}">{% csrf_token %}<button class="notification-delete" type="submit" aria-label="Delete notification">×</button></form>{% endif %}</div>
+                  {% else %}
+                    <a class="notification-item" href="#post-{{ item.photo.id }}"><span class="notification-icon"><svg><use href="#bell"/></svg></span><span class="notification-copy"><span><strong>{{ item.name }}</strong> {{ item.text }}</span><small>{{ item.time|timesince }} ago · {{ item.photo.caption|default:"Travel memory"|truncatechars:34 }}</small></span><span class="notification-dot"></span></a>
+                  {% endif %}
+                {% empty %}<div class="notification-empty"><span class="notification-empty-icon">✧</span><strong>All caught up</strong><p>No new activity from your circle.</p></div>
+                {% endfor %}
+              </div>
+            </div>
+            <div class="account top-account">
+              <button class="avatar account-avatar" type="button" aria-label="Open account menu" aria-expanded="false">{% if user_avatar %}<img src="{{ user_avatar }}" alt="Profile photo">{% else %}{{ user_initials }}{% endif %}</button>
+              <div class="account-menu" hidden><a href="{% url 'profile' %}">◉ &nbsp; View profile</a><a href="{% url 'settings' %}">⚙ &nbsp; Account settings</a>{% if request.user.is_authenticated %}<a href="{% url 'logout' %}">↪ &nbsp; Log out</a>{% else %}<a href="{% url 'login' %}">↪ &nbsp; Log in</a>{% endif %}</div>
+            </div>
+          </div>
         </header>
 
         <main class="content">
@@ -92,7 +112,7 @@
                     <p>{% if photo.place %}A memory from {{ photo.place.name }}.{% else %}A little moment from the road.{% endif %}</p>
                     {% if photo.journal_entry %}<section class="post-shared-journal"><strong>{{ photo.journal_entry.title }}</strong><p>{{ photo.journal_entry.body|linebreaksbr }}</p></section>{% endif %}
                     {% if photo.tags.all %}<div class="post-shared-tags" aria-label="Journey tags">{% for tag in photo.tags.all %}<span>#{{ tag.name }}</span>{% endfor %}</div>{% endif %}
-                    <div class="post-actions"><button class="like-button" type="button" data-photo-id="{{ photo.id }}" data-liked="{% if request.user.is_authenticated and request.user in photo.likes.all %}true{% else %}false{% endif %}" aria-label="Like, {{ photo.likes.count }} likes"><svg><use href="#heart"/></svg><span>{{ photo.likes.count }}</span></button><button class="comment-toggle" type="button" aria-label="Comments, {{ photo.comments.count }} comments"><svg><use href="#comment"/></svg><span>{{ photo.comments.count }}</span></button><button class="share-button" type="button" aria-label="Share"><svg><use href="#send"/></svg></button><button class="save save-button" type="button" aria-label="Save post" data-photo-id="{{ photo.id }}"><svg><use href="#bookmark"/></svg></button></div>
+                    <div class="post-actions"><button class="like-button{% if request.user.is_authenticated and request.user in photo.likes.all %} liked{% endif %}" type="button" data-photo-id="{{ photo.id }}" data-liked="{% if request.user.is_authenticated and request.user in photo.likes.all %}true{% else %}false{% endif %}" aria-pressed="{% if request.user.is_authenticated and request.user in photo.likes.all %}true{% else %}false{% endif %}" aria-label="{% if request.user.is_authenticated and request.user in photo.likes.all %}Unlike{% else %}Like{% endif %}, {{ photo.likes.count }} likes"><svg><use href="#heart"/></svg><span>{{ photo.likes.count }}</span></button><button class="comment-toggle" type="button" aria-label="Comments, {{ photo.comments.count }} comments"><svg><use href="#comment"/></svg><span>{{ photo.comments.count }}</span></button><button class="share-button" type="button" aria-label="Share"><svg><use href="#send"/></svg></button><button class="save save-button" type="button" aria-label="Save post" data-photo-id="{{ photo.id }}"><svg><use href="#bookmark"/></svg></button></div>
                     <div class="comments-panel" hidden>
                       <div class="comment-list">
                         {% for comment in photo.comments.all %}
@@ -183,6 +203,7 @@
       </div>
     </div>
     <nav class="bottom-nav" aria-label="Mobile navigation"><a class="active" href="{% url 'dashboard' %}" aria-current="page"><svg><use href="#grid"/></svg><span>Feed</span></a><a href="{% url 'diary' %}"><svg><use href="#book"/></svg><span>Diary</span></a><a class="add-entry" href="{% url 'add_memory' %}" aria-label="New entry">＋</a><a href="{% url 'journeys' %}"><svg><use href="#route"/></svg><span>Journeys</span></a><a href="{% url 'saved_places' %}"><svg><use href="#bookmark"/></svg><span>Saved</span></a></nav>
+    {% include "diary/upload_success_dialog.html" %}
     <div class="toast" role="status" aria-live="polite"></div>
     <script>
       (() => {
@@ -220,6 +241,7 @@
         });
 
         document.querySelectorAll(".like-button").forEach((button) => {
+          button.setAttribute("aria-pressed", String(button.dataset.liked === "true"));
           button.addEventListener("click", async () => {
             const count = button.querySelector("span");
             const photoId = button.dataset.photoId;
@@ -231,6 +253,8 @@
                 localStorage.setItem(key, String(!liked));
                 count.textContent = Math.max(0, Number(count.textContent) + (liked ? -1 : 1));
                 button.classList.toggle("liked", !liked);
+                button.dataset.liked = String(!liked);
+                button.setAttribute("aria-pressed", String(!liked));
                 showToast(liked ? "Like removed" : "Liked locally — sign in to sync it");
                 return;
               }
@@ -238,6 +262,9 @@
               const result = await response.json();
               count.textContent = result.like_count;
               button.classList.toggle("liked", result.liked);
+              button.dataset.liked = String(result.liked);
+              button.setAttribute("aria-pressed", String(result.liked));
+              button.setAttribute("aria-label", `${result.liked ? "Unlike" : "Like"}, ${result.like_count} likes`);
               showToast(result.liked ? "Added to your likes" : "Like removed");
             } catch (error) {
               showToast("Could not update this like");
@@ -466,12 +493,16 @@
             if (badge) badge.remove();
           }
         });
-        document.addEventListener("click", () => {
+        const accountAvatars = [...document.querySelectorAll(".account-avatar")];
+        const accountMenus = [...document.querySelectorAll(".account-menu")];
+        const closeAccountMenus = () => {
+          accountMenus.forEach((menu) => { menu.hidden = true; });
+          accountAvatars.forEach((avatar) => avatar.setAttribute("aria-expanded", "false"));
+        };
+        document.addEventListener("click", (event) => {
           if (notificationMenu) notificationMenu.hidden = true;
-          if (accountMenu) accountMenu.hidden = true;
+          if (!event.target.closest(".account")) closeAccountMenus();
         });
-        const accountAvatar = document.querySelector(".account-avatar");
-        const accountMenu = document.querySelector(".account-menu");
         const themeToggle = document.querySelector(".theme-toggle");
         const updateThemeToggle = () => {
           const isDark = document.documentElement.dataset.theme === "dark";
@@ -487,11 +518,14 @@
           localStorage.setItem("roam-theme", theme);
           updateThemeToggle();
         });
-        accountAvatar?.addEventListener("click", (event) => {
+        accountAvatars.forEach((accountAvatar) => accountAvatar.addEventListener("click", (event) => {
           event.stopPropagation();
-          accountMenu.hidden = !accountMenu.hidden;
+          const accountMenu = accountAvatar.closest(".account").querySelector(".account-menu");
+          const shouldOpen = accountMenu.hidden;
+          closeAccountMenus();
+          accountMenu.hidden = !shouldOpen;
           accountAvatar.setAttribute("aria-expanded", String(!accountMenu.hidden));
-        });
+        }));
 
         const posts = [...document.querySelectorAll("[data-post]")];
         const feedLoader = document.querySelector("[data-feed-loader]");

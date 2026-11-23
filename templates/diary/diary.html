@@ -3,10 +3,64 @@
 {% block breadcrumb %}My diary{% endblock %}
 {% block content %}
   <section class="page-hero"><div><p class="eyebrow">YOUR MEMORIES</p><h1>My <span>diary</span></h1><p>Small moments. Lasting memories. All yours.</p></div><a class="primary-button" href="{% url 'add_memory' %}"><span>＋</span> New entry</a></section>
-  <div class="page-toolbar"><nav class="page-tabs" aria-label="Diary filters"><a class="active" href="#memories">All memories · {{ entries|length }}</a><a href="#memories">Private entries</a></nav><small>Your world, one memory at a time.</small></div>
-  <section class="social-grid" id="memories">
+  <div class="page-toolbar"><nav class="page-tabs" aria-label="Diary sections"><a class="active" href="#memories">My posts · {{ entries|length }}</a><a href="#liked-memories">Liked posts · <span data-liked-post-count>{{ liked_entries|length }}</span></a></nav><small>Your world, one memory at a time.</small></div>
+  <section class="social-grid" id="memories" aria-label="Your posts">
     {% for entry in entries %}
-      <article class="memory-card panel">{% if entry.image %}<img src="{{ entry.image.url }}" alt="{{ entry.caption|default:'Travel memory' }}" data-fullscreen-photo tabindex="0" role="button" aria-label="View full-size photo: {{ entry.caption|default:'Travel memory' }}">{% else %}<div class="memory-placeholder" aria-hidden="true">✧</div>{% endif %}<div class="memory-card-body"><small>{% if entry.place %}{{ entry.place.name }}{% else %}Travel memory{% endif %} · {{ entry.created_at|date:"M j, Y" }}</small><h2>{{ entry.caption|default:"A moment worth remembering" }}</h2><p>{{ entry.travel.title }}</p>{% if request.user.is_authenticated and entry.author_id == request.user.id %}<details class="owner-controls"><summary aria-label="Post options">•••</summary><div class="owner-menu"><form method="post" action="{% url 'edit_photo_caption' entry.id %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><input name="caption" value="{{ entry.caption }}" maxlength="255" aria-label="Edit caption"><button type="submit">Save caption</button></form><form method="post" action="{% url 'delete_photo' entry.id %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="danger-action" type="submit">Delete post</button></form></div></details>{% endif %}<a href="{% url 'add_memory' %}">Add another memory →</a></div></article>
+      <article class="memory-card panel">{% if entry.image %}<img src="{{ entry.image.url }}" alt="{{ entry.caption|default:'Travel memory' }}" data-fullscreen-photo tabindex="0" role="button" aria-label="View full-size photo: {{ entry.caption|default:'Travel memory' }}">{% else %}<div class="memory-placeholder" aria-hidden="true">✧</div>{% endif %}<div class="memory-card-body"><small>{% if entry.place %}{{ entry.place.name }}{% else %}Travel memory{% endif %} · {{ entry.created_at|date:"M j, Y" }}</small><h2>{{ entry.caption|default:"A moment worth remembering" }}</h2><p>{{ entry.travel.title }}</p><button class="diary-like-button{% if request.user.is_authenticated and request.user in entry.likes.all %} liked{% endif %}" type="button" data-diary-like data-photo-id="{{ entry.id }}" aria-pressed="{% if request.user.is_authenticated and request.user in entry.likes.all %}true{% else %}false{% endif %}" aria-label="{% if request.user.is_authenticated and request.user in entry.likes.all %}Unlike{% else %}Like{% endif %} post, {{ entry.likes.count }} likes"><svg><use href="#heart"/></svg><span>{{ entry.likes.count }}</span></button>{% if request.user.is_authenticated and entry.author_id == request.user.id %}<details class="owner-controls"><summary aria-label="Post options">•••</summary><div class="owner-menu"><form method="post" action="{% url 'edit_photo_caption' entry.id %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><input name="caption" value="{{ entry.caption }}" maxlength="255" aria-label="Edit caption"><button type="submit">Save caption</button></form><form method="post" action="{% url 'delete_photo' entry.id %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="danger-action" type="submit">Delete post</button></form></div></details>{% endif %}<a href="{% url 'add_memory' %}">Add another memory →</a></div></article>
     {% empty %}<div class="empty-page panel"><span class="sparkle">✧</span><h2>Your diary is waiting.</h2><p>Upload your first photo and start building your story.</p><a class="primary-button" href="{% url 'dashboard' %}#upload">Upload a memory</a></div>{% endfor %}
   </section>
+  <section class="diary-liked-section" id="liked-memories" aria-labelledby="liked-memories-title">
+    <div class="section-title"><h2 id="liked-memories-title">Liked posts</h2><small>Posts you’ve liked</small></div>
+    <section class="social-grid" aria-label="Posts you liked">
+      {% for entry in liked_entries %}
+        <article class="memory-card panel" data-liked-memory-card>{% if entry.image %}<img src="{{ entry.image.url }}" alt="{{ entry.caption|default:'Travel memory' }}" data-fullscreen-photo tabindex="0" role="button" aria-label="View full-size photo: {{ entry.caption|default:'Travel memory' }}">{% else %}<div class="memory-placeholder" aria-hidden="true">♡</div>{% endif %}<div class="memory-card-body"><small>{% if entry.place %}{{ entry.place.name }}{% else %}Travel memory{% endif %} · {{ entry.created_at|date:"M j, Y" }}</small><h2>{{ entry.caption|default:"A moment worth remembering" }}</h2><p>{{ entry.travel.title }}</p><button class="diary-like-button liked" type="button" data-diary-like data-photo-id="{{ entry.id }}" aria-pressed="true" aria-label="Unlike post, {{ entry.likes.count }} likes"><svg><use href="#heart"/></svg><span>{{ entry.likes.count }}</span></button></div></article>
+      {% endfor %}
+      <div class="empty-page panel" data-liked-empty{% if liked_entries %} hidden{% endif %}><span class="sparkle">♡</span><h2>No liked posts yet.</h2><p>Posts you like will be collected here.</p><a class="primary-button" href="{% url 'dashboard' %}">Explore the feed</a></div>
+    </section>
+  </section>
+  <p class="diary-like-status" data-diary-like-status role="status" aria-live="polite"></p>
+  <div hidden>{% csrf_token %}</div>
+  <script>
+    (() => {
+      const status = document.querySelector("[data-diary-like-status]");
+      const getCsrfToken = () => decodeURIComponent(
+        document.cookie.split("; ").find((cookie) => cookie.startsWith("csrftoken="))?.split("=")[1] || ""
+      ) || document.querySelector("[name=csrfmiddlewaretoken]")?.value || "";
+
+      document.querySelectorAll("[data-diary-like]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          button.disabled = true;
+          try {
+            const response = await fetch(`/api/photos/${button.dataset.photoId}/like/`, {
+              method: "POST",
+              headers: {"X-CSRFToken": getCsrfToken()},
+              credentials: "same-origin",
+            });
+            if (!response.ok) throw new Error(response.status === 401 ? "Log in to like posts." : "Could not update this like.");
+            const result = await response.json();
+            button.classList.toggle("liked", result.liked);
+            button.setAttribute("aria-pressed", String(result.liked));
+            button.setAttribute("aria-label", `${result.liked ? "Unlike" : "Like"} post, ${result.like_count} likes`);
+            button.querySelector("span").textContent = result.like_count;
+            if (!result.liked) {
+              const likedCard = [...document.querySelectorAll("[data-liked-memory-card]")]
+                .find((card) => card.querySelector("[data-photo-id]")?.dataset.photoId === button.dataset.photoId);
+              if (likedCard) {
+                likedCard.remove();
+                const count = document.querySelector("[data-liked-post-count]");
+                count.textContent = Math.max(0, Number(count.textContent) - 1);
+                const emptyState = document.querySelector("[data-liked-empty]");
+                if (!document.querySelector("[data-liked-memory-card]")) emptyState.hidden = false;
+              }
+            }
+            status.textContent = result.liked ? "Post liked." : "Like removed.";
+          } catch (error) {
+            status.textContent = error.message || "Could not update this like.";
+          } finally {
+            button.disabled = false;
+          }
+        });
+      });
+    })();
+  </script>
 {% endblock %}

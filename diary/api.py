@@ -360,6 +360,55 @@ def geocode(request):
     return Response(response.json())
 
 
+@api_view(["GET"])
+def reverse_geocode(request):
+    try:
+        latitude = float(request.query_params["latitude"])
+        longitude = float(request.query_params["longitude"])
+    except (KeyError, TypeError, ValueError):
+        return Response({"detail": "latitude and longitude are required numbers."}, status=400)
+    if not -90 <= latitude <= 90 or not -180 <= longitude <= 180:
+        return Response({"detail": "latitude and longitude are out of range."}, status=400)
+
+    try:
+        response = requests.get(
+            "https://nominatim.openstreetmap.org/reverse",
+            params={
+                "lat": latitude,
+                "lon": longitude,
+                "format": "jsonv2",
+                "zoom": 18,
+                "addressdetails": 1,
+            },
+            headers={"User-Agent": "RoamTravelDiary/1.0"},
+            timeout=8,
+        )
+        response.raise_for_status()
+    except requests.RequestException:
+        return Response({"detail": "Address lookup is temporarily unavailable."}, status=502)
+
+    location = response.json()
+    address = location.get("address", {})
+    name = location.get("name") or next(
+        (
+            address[key]
+            for key in (
+                "amenity", "tourism", "shop", "leisure", "building", "road",
+                "neighbourhood", "suburb", "city", "town", "village",
+                "municipality", "county",
+            )
+            if address.get(key)
+        ),
+        "",
+    )
+    return Response({
+        "name": name,
+        "address": location.get("display_name", ""),
+        "latitude": latitude,
+        "longitude": longitude,
+    })
+
+
 def _normalize_location_text(value):
     return unicodedata.normalize(
         "NFKD", str(value or ""),

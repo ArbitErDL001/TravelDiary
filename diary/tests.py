@@ -1,16 +1,25 @@
 from datetime import date
+from io import BytesIO
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
+from PIL import Image
 from rest_framework.test import APIClient
 
 from .models import (
     Accommodation, Country, Expense, Friendship, ItineraryDay, JournalEntry,
-    PhotoComment, Place, Region, Tag, Travel, TravelPhoto, UserProfile,
+    Notification, PhotoComment, Place, Region, Tag, Travel, TravelPhoto,
+    UserProfile,
 )
+
+
+def uploaded_test_image(name):
+    image_data = BytesIO()
+    Image.new("RGB", (1, 1), color="white").save(image_data, format="JPEG")
+    return SimpleUploadedFile(name, image_data.getvalue(), content_type="image/jpeg")
 
 
 class PrivateTravelDataTests(TestCase):
@@ -101,9 +110,16 @@ class PrivateTravelDataTests(TestCase):
         self.client.force_login(self.owner)
         form_response = self.client.get("/memory/new/")
         self.assertContains(form_response, "Create a new journey")
-        self.assertContains(form_response, "Search and add a new place")
+        self.assertContains(form_response, "Map location picker")
+        self.assertContains(form_response, 'id="memory-place-search"')
         self.assertContains(form_response, 'data-location-autocomplete="place"')
+        self.assertContains(form_response, 'data-place-map-confirm')
+        self.assertContains(form_response, 'id="memory-place-map"')
+        self.assertContains(form_response, "Confirm location")
+        self.assertNotContains(form_response, 'id="id_new_place-name" type="text"')
+        self.assertNotContains(form_response, 'id="id_new_place-address" type="text"')
         self.assertContains(form_response, "it will not appear with your public post")
+        self.assertContains(form_response, 'data-photo-preview')
 
         with TemporaryDirectory() as media_root, override_settings(MEDIA_ROOT=media_root):
             response = self.client.post(
@@ -123,14 +139,12 @@ class PrivateTravelDataTests(TestCase):
                     "new_place-latitude": "41.890210",
                     "new_place-longitude": "12.492230",
                     "caption": "A day in Rome",
-                    "image": SimpleUploadedFile(
-                        "rome.jpg",
-                        b"test-image",
-                        content_type="image/jpeg",
-                    ),
+                    "image": uploaded_test_image("rome.jpg"),
                 },
             )
             self.assertRedirects(response, "/diary/")
+            photo = TravelPhoto.objects.get(caption="A day in Rome")
+            self.assertTrue(photo.image.storage.exists(photo.image.name))
 
         travel = Travel.objects.get(owner=self.owner, title="Recent Italy trip")
         self.assertEqual(travel.status, "completed")
@@ -145,6 +159,16 @@ class PrivateTravelDataTests(TestCase):
         self.assertEqual(photo.place, place)
         self.assertEqual(str(place.latitude), "41.890210")
         self.assertEqual(str(place.longitude), "12.492230")
+
+    @override_settings(MAPTILER_API_KEY="test-maptiler-key")
+    def test_maptiler_key_is_available_to_both_map_views(self):
+        self.client.force_login(self.owner)
+
+        memory_response = self.client.get("/memory/new/")
+        map_response = self.client.get("/map/")
+
+        self.assertContains(memory_response, 'data-maptiler-api-key="test-maptiler-key"')
+        self.assertContains(map_response, 'data-maptiler-api-key="test-maptiler-key"')
 
     def test_memory_saves_private_details_to_existing_journey_not_public_post(self):
         private_details = "Remember the tucked-away guesthouse near the station."
@@ -161,11 +185,7 @@ class PrivateTravelDataTests(TestCase):
                     "travel": self.travel.pk,
                     "details": private_details,
                     "caption": "A morning on the road",
-                    "image": SimpleUploadedFile(
-                        "private-details.jpg",
-                        b"test-image",
-                        content_type="image/jpeg",
-                    ),
+                    "image": uploaded_test_image("private-details.jpg"),
                 },
             )
             self.assertRedirects(response, "/diary/")
@@ -216,11 +236,7 @@ class PrivateTravelDataTests(TestCase):
                     "journal-entry_date": "2026-06-02",
                     "journal-mood": "peaceful",
                     "journey_tags-tags": ", ".join(public_tags),
-                    "image": SimpleUploadedFile(
-                        "harbor.jpg",
-                        b"test-image",
-                        content_type="image/jpeg",
-                    ),
+                    "image": uploaded_test_image("harbor.jpg"),
                 },
             )
             self.assertRedirects(response, "/diary/")
@@ -271,11 +287,7 @@ class PrivateTravelDataTests(TestCase):
                     "travel": self.travel.pk,
                     "caption": "Should not be saved",
                     "accommodation-name": "Incomplete booking",
-                    "image": SimpleUploadedFile(
-                        "incomplete.jpg",
-                        b"test-image",
-                        content_type="image/jpeg",
-                    ),
+                    "image": uploaded_test_image("incomplete.jpg"),
                 },
             )
 
@@ -293,17 +305,212 @@ class PrivateTravelDataTests(TestCase):
                     "travel": self.travel.pk,
                     "place": "__new__",
                     "new_place-name": "Unlocated place",
-                    "image": SimpleUploadedFile(
-                        "memory.jpg",
-                        b"test-image",
-                        content_type="image/jpeg",
-                    ),
+                    "image": uploaded_test_image("memory.jpg"),
                 },
             )
 
         self.assertEqual(response.status_code, 400)
-        self.assertContains(response, "Choose a place recommendation", status_code=400)
+        self.assertContains(response, "Pin a location on the map and confirm it", status_code=400)
         self.assertFalse(Place.objects.filter(owner=self.owner, name="Unlocated place").exists())
+
+    @patch("diary.api.requests.get")
+    def test_reverse_geocode_returns_name_address_and_coordinates(self, mock_get):
+        mock_get.return_value.json.return_value = {
+            "name": "Eiffel Tower",
+            "display_name": "Eiffel Tower, Paris, France",
+            "address": {"city": "Paris", "country": "France"},
+        }
+
+        response = self.client.get("/api/reverse-geocode/?latitude=48.8584&longitude=2.2945")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data, {
+            "name": "Eiffel Tower",
+            "address": "Eiffel Tower, Paris, France",
+            "latitude": 48.8584,
+            "longitude": 2.2945,
+        })
+        mock_get.assert_called_once()
+
+    def test_reverse_geocode_rejects_out_of_range_coordinates(self):
+        response = self.client.get("/api/reverse-geocode/?latitude=91&longitude=0")
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_memory_rejects_invalid_image_upload(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.post(
+            "/memory/new/",
+            {
+                "travel": self.travel.pk,
+                "caption": "Not an image",
+                "image": SimpleUploadedFile(
+                    "not-an-image.jpg",
+                    b"not an image",
+                    content_type="image/jpeg",
+                ),
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, "Upload a valid image.", status_code=400)
+        self.assertFalse(TravelPhoto.objects.filter(caption="Not an image").exists())
+
+    def test_quick_posts_create_and_reuse_my_memories_journey(self):
+        Friendship.objects.create(user=self.owner, friend=self.other, status="accepted")
+        Friendship.objects.create(user=self.other, friend=self.owner, status="accepted")
+        self.client.force_login(self.owner)
+
+        with TemporaryDirectory() as media_root, override_settings(MEDIA_ROOT=media_root):
+            for caption in ("First quick post", "Second quick post"):
+                response = self.client.post(
+                    "/memory/new/",
+                    {
+                        "travel": "__quick__",
+                        "caption": caption,
+                        "image": uploaded_test_image(f"{caption.replace(' ', '-').lower()}.jpg"),
+                    },
+                    follow=True,
+                )
+                self.assertEqual(response.redirect_chain, [("/diary/", 302)])
+                self.assertContains(response, 'data-upload-success-dialog')
+                self.assertContains(response, 'data-upload-success-close')
+
+            memory_journeys = Travel.objects.filter(owner=self.owner, title="My memories")
+            self.assertEqual(memory_journeys.count(), 1)
+            self.assertEqual(
+                TravelPhoto.objects.filter(
+                    travel=memory_journeys.get(),
+                    author=self.owner,
+                ).count(),
+                2,
+            )
+
+        feed_response = self.client.get("/diary/")
+        self.assertContains(feed_response, "First quick post")
+        self.assertContains(feed_response, "Second quick post")
+        self.assertContains(self.client.get("/memories/"), "First quick post")
+        self.assertContains(self.client.get("/profile/"), "First quick post")
+        self.assertContains(self.client.get("/notifications/"), "posted a new memory")
+        friend_client = self.client_class()
+        friend_client.force_login(self.other)
+        self.assertContains(friend_client.get("/diary/"), "First quick post")
+        self.assertEqual(
+            Notification.objects.filter(
+                recipient=self.owner,
+                kind="post",
+                photo__author=self.owner,
+            ).count(),
+            2,
+        )
+
+    def test_profile_upload_shows_ok_confirmation_and_is_visible_to_friends(self):
+        Friendship.objects.create(user=self.owner, friend=self.other, status="accepted")
+        Friendship.objects.create(user=self.other, friend=self.owner, status="accepted")
+        self.client.force_login(self.owner)
+
+        profile_response = self.client.get("/profile/")
+        self.assertContains(profile_response, 'id="profile-quick-image"')
+        self.assertContains(profile_response, 'class="file-picker"')
+        self.assertContains(profile_response, "Choose a photo to upload")
+        self.assertContains(profile_response, "data-profile-upload-picker-label-text")
+
+        with TemporaryDirectory() as media_root, override_settings(MEDIA_ROOT=media_root):
+            response = self.client.post(
+                "/memory/new/",
+                {
+                    "travel": "__quick__",
+                    "next": "/profile/",
+                    "caption": "Profile quick upload",
+                    "image": uploaded_test_image("profile-quick-upload.jpg"),
+                },
+                follow=True,
+            )
+
+        self.assertEqual(response.redirect_chain, [("/profile/", 302)])
+        self.assertContains(response, 'data-upload-success-dialog')
+        self.assertContains(response, 'data-upload-success-close')
+        self.assertContains(response, "Your photo has been uploaded successfully.")
+        self.assertContains(response, "Profile quick upload")
+
+        friend_client = self.client_class()
+        friend_client.force_login(self.other)
+        self.assertContains(
+            friend_client.get(f"/profile/{self.owner.pk}/"),
+            "Profile quick upload",
+        )
+
+    def test_my_diary_only_shows_posts_authored_by_current_user(self):
+        own_post = TravelPhoto.objects.create(
+            travel=self.travel,
+            author=self.owner,
+            caption="My private diary post",
+        )
+        other_travel = Travel.objects.create(
+            owner=self.other,
+            title="Another traveler's trip",
+            start_date=date(2026, 6, 1),
+            end_date=date(2026, 6, 4),
+        )
+        TravelPhoto.objects.create(
+            travel=other_travel,
+            author=self.other,
+            caption="Another account's post",
+        )
+        liked_post = TravelPhoto.objects.create(
+            travel=other_travel,
+            author=self.other,
+            caption="Post I liked",
+        )
+        liked_post.likes.add(self.owner)
+
+        self.client.force_login(self.owner)
+        response = self.client.get("/memories/")
+
+        self.assertEqual([entry.pk for entry in response.context["entries"]], [own_post.pk])
+        self.assertEqual([entry.pk for entry in response.context["liked_entries"]], [liked_post.pk])
+        self.assertContains(response, 'class="diary-like-button liked"')
+        self.assertContains(response, 'aria-pressed="true"')
+
+        self.client.logout()
+        guest_response = self.client.get("/memories/")
+        self.assertEqual(guest_response.context["entries"], [])
+        self.assertEqual(guest_response.context["liked_entries"], [])
+
+    def test_top_avatar_opens_account_actions(self):
+        self.client.force_login(self.owner)
+
+        diary_response = self.client.get("/memories/")
+        dashboard_response = self.client.get("/diary/")
+
+        self.assertContains(diary_response, 'class="account top-account"')
+        self.assertContains(diary_response, 'aria-label="Open account menu"')
+        self.assertContains(diary_response, "Account settings")
+        self.assertContains(diary_response, "Log out")
+        self.assertContains(dashboard_response, 'class="account top-account"')
+        self.assertContains(dashboard_response, "Account settings")
+        self.assertContains(dashboard_response, "Log out")
+
+    def test_dashboard_keeps_liked_post_button_lit_after_reload(self):
+        Friendship.objects.create(user=self.owner, friend=self.other, status="accepted")
+        photo = TravelPhoto.objects.create(
+            travel=self.travel,
+            author=self.other,
+            caption="Liked feed post",
+        )
+        api_client = APIClient()
+        api_client.force_authenticate(self.owner)
+        like_response = api_client.post(f"/api/photos/{photo.pk}/like/")
+        self.assertEqual(like_response.status_code, 200)
+        self.assertEqual(like_response.data, {"liked": True, "like_count": 1})
+        self.client.force_login(self.owner)
+
+        response = self.client.get("/diary/")
+
+        self.assertContains(response, f'data-photo-id="{photo.pk}" data-liked="true"')
+        self.assertContains(response, 'class="like-button liked"')
+        self.assertContains(response, 'aria-pressed="true"')
 
     def test_new_journey_cannot_use_another_users_private_country(self):
         private_country = Country.objects.create(
