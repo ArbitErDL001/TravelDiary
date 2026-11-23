@@ -29,7 +29,7 @@ TravelDiary is a Django travel journal for saving memories, planning journeys, d
 - Save places and explore them on an interactive map
 - Follow friends, share posts, and view notifications
 - Manage your profile, avatar, cover image, and travel details
-- Sign up, log in, or continue with Google
+- Sign up, log in.
 
 ## Built With
 
