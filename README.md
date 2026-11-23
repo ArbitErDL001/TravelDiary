@@ -5,7 +5,7 @@ TravelDiary is a Django travel journal for saving memories, planning journeys, d
 ## Screenshots
 
 ### Landing Page
-![Landing page](projectScreenshots/landingpage1.jpeg)
+![Landing page](projectScreenshots/landpagereal.jpeg)
 
 ### Your Feed
 ![Your feed](projectScreenshots/yourfeedpage.jpeg)
