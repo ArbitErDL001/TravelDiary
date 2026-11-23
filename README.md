@@ -40,7 +40,7 @@ TravelDiary is a Django travel journal for saving memories, planning journeys, d
 - Leaflet/OpenStreetMap map services
 
 ## Run the Project
-Open `laxii.pythonanywhere.com`.
+[![Roam – Live Site](https://img.shields.io/badge/Roam-Live%20Site-7846d6?style=for-the-badge&logo=pythonanywhere&logoColor=white)](https://laxii.pythonanywhere.com/)
 
 ## About the Author
 
@@ -50,8 +50,16 @@ Open `laxii.pythonanywhere.com`.
 
 * <a href="mailto:202380330@psu.palawan.edu.ph"><img src="https://img.shields.io/badge/Email-202380330%40psu.palawan.edu.ph-D14836?style=flat-square&logo=gmail&logoColor=white" alt="Email"></a>
 
-**Name:** Members
-- * <a href="mailto:202380324@psu.palawan.edu.ph"><img src="https://img.shields.io/badge/Email-202380324%40psu.palawan.edu.ph-D14836?style=flat-square&logo=gmail&logoColor=white" alt="Email"></a>
-- * <a href="mailto:202380341@psu.palawan.edu.ph"><img src="https://img.shields.io/badge/Email-202380341%40psu.palawan.edu.ph-D14836?style=flat-square&logo=gmail&logoColor=white" alt="Email"></a>
-- * <a href="mailto:202180283@psu.palawan.edu.ph"><img src="https://img.shields.io/badge/Email-202180283%40psu.palawan.edu.ph-D14836?style=flat-square&logo=gmail&logoColor=white" alt="Email"></a>
-- * <a href="mailto:202380004@psu.palawan.edu.ph"><img src="https://img.shields.io/badge/Email-202380004%40psu.palawan.edu.ph-D14836?style=flat-square&logo=gmail&logoColor=white" alt="Email"></a>
+## Members (Collective in Names Only)
+
+- **Jezelle**  
+  <a href="mailto:202380324@psu.palawan.edu.ph"><img src="https://img.shields.io/badge/Email-202380324%40psu.palawan.edu.ph-D14836?style=flat-square&logo=gmail&logoColor=white" alt="Email"></a>
+
+- **Timo**  
+  <a href="mailto:202380341@psu.palawan.edu.ph"><img src="https://img.shields.io/badge/Email-202380341%40psu.palawan.edu.ph-D14836?style=flat-square&logo=gmail&logoColor=white" alt="Email"></a>
+
+- **xTian**  
+  <a href="mailto:202180283@psu.palawan.edu.ph"><img src="https://img.shields.io/badge/Email-202180283%40psu.palawan.edu.ph-D14836?style=flat-square&logo=gmail&logoColor=white" alt="Email"></a>
+
+- **Erl**  
+  <a href="mailto:202380004@psu.palawan.edu.ph"><img src="https://img.shields.io/badge/Email-202380004%40psu.palawan.edu.ph-D14836?style=flat-square&logo=gmail&logoColor=white" alt="Email"></a>
