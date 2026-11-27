@@ -2,6 +2,10 @@
 
 TravelDiary is a Django travel journal for saving memories, planning journeys, discovering places, and sharing experiences with friends.
 
+# IF you want to test the website with friends already posted use this account.
+User: `dale.maceda`
+Password `TestUser123!`
+
 ## Screenshots
 
 ### Landing Page
